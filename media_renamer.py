@@ -139,4 +139,79 @@ class MediaRenamer:
                     # 执行重命名操作
                     self.process_folder(folder_path, new_folder_name, matched_content)
 
+    def match_mode_2(self, parent_folder_path, library_type_index, naming_rule_index):
+        for folder_name in os.listdir(parent_folder_path):
+            folder_path = os.path.join(parent_folder_path, folder_name)
+            logger.info(f"Processing folder: {folder_path}")  
+            if folder_path in self.processed_folders:
+                continue
 
+            title, year = self.extract_folder_info(folder_name)
+
+            # Search for a match in TMDB data
+            matched_content = None
+            if library_type_index == 1:  # Assuming 1 represents movies
+                logger.info(f"Searching in movies: {title} ({year})")  
+                matched_content = self.tmdb_api.search_movie(title)
+                if matched_content and matched_content['results']:
+                    matched_movie = matched_content['results'][0]
+                    logger.info(f"Found in TMDB: {matched_movie['title']} ({matched_movie['release_date'][:4]}) {{tmdb-{matched_movie['id']}}}")
+                    tmdb_id = matched_movie['id']  # Get the TMDB ID
+                    new_folder_name = self.generate_new_folder_name(matched_movie['title'], matched_movie['release_date'][:4], tmdb_id, naming_rule_index)
+                    # Perform the renaming operation
+                    self.process_folder(folder_path, new_folder_name, matched_movie)
+            elif library_type_index == 2:  # Assuming 2 represents TV shows
+                logger.info(f"Searching in TV shows: {title} ({year})")  
+                matched_content = self.tmdb_api.search_tv(title)
+                if matched_content and matched_content['results']:
+                    matched_show = matched_content['results'][0]
+                    logger.info(f"Found in TMDB: {matched_show['name']} ({matched_show['first_air_date'][:4]}) {{tmdb-{matched_show['id']}}}")
+                    tmdb_id = matched_show['id']  # Get the TMDB ID
+                    new_folder_name = self.generate_new_folder_name(matched_show['name'], matched_show['first_air_date'][:4], tmdb_id, naming_rule_index)
+                    # Perform the renaming operation
+                    self.process_folder(folder_path, new_folder_name, matched_show)
+
+    def match_mode_3(self, parent_folder_path, library_type_index, naming_rule_index):
+        for folder_name in os.listdir(parent_folder_path):
+            folder_path = os.path.join(parent_folder_path, folder_name)
+            logger.info(f"正在处理文件夹：{folder_path}")  
+            if folder_path in self.processed_folders:
+                continue
+
+            title, year = self.extract_folder_info(folder_name)
+
+            # 在Plex数据中查找匹配
+            matched_content = None
+            if library_type_index == 1:  # 假设1代表电影
+                logger.info(f"正在搜索电影中：{title} ({year})")  
+                matched_content = self.plex_api.search_movie(title)
+                if matched_content:
+                    logger.info(f"从库中获取电影: {matched_content['title']} ({matched_content['year']}) {{tmdbid-{matched_content['tmdbid']}}}")
+                    tmdb_id = matched_content['tmdbid']  # 获取tmdbid
+                    new_folder_name = self.generate_new_folder_name(matched_content['title'], matched_content['year'], tmdb_id, naming_rule_index)
+                    # 执行重命名操作
+                    self.process_folder(folder_path, new_folder_name, matched_content)
+            elif library_type_index == 2:  # 假设2代表剧集
+                logger.info(f"正在搜索剧集中：{title} ({year})")  
+                matched_content = self.plex_api.search_show(title, year)
+                if matched_content:
+                    logger.info(f"从库中获取剧集: {matched_content['title']} ({matched_content['year']}) {{tmdbid-{matched_content['tmdbid']}}}")
+                    tmdb_id = matched_content['tmdbid']  # 获取tmdbid
+                    new_folder_name = self.generate_new_folder_name(matched_content['title'], matched_content['year'], tmdb_id, naming_rule_index)
+                    # 执行重命名操作
+                    self.process_folder(folder_path, new_folder_name, matched_content)
+
+
+    def match_mode_4(self, parent_folder_path):
+        for folder_name in os.listdir(parent_folder_path):
+            folder_path = os.path.join(parent_folder_path, folder_name)
+            if folder_path in self.processed_folders:
+                continue
+
+            title, year = self.extract_folder_info(folder_name)
+
+            # Generate new folder name based on naming rule 1
+            new_folder_name = self.generate_new_folder_name(title, year, naming_rule_index=1)
+
+            # Perform the renaming operation
+            self.process_folder(folder_path, new_folder_name, None)
