@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # @Time : 2023/11/03
 # @File : api.py
-
+import json
 import requests
 from xml.etree import ElementTree
 from typing import List, Dict
@@ -15,11 +15,15 @@ handler_to_remove = logger.handlers[0]
 logger.removeHandler(handler_to_remove)
 
 class PlexApi:
-    def __init__(self, plex_url, plex_token, execute_request=True):  # 添加一个新的参数
+    def __init__(self, plex_url, plex_token, execute_request=True):
         self.plex_url = plex_url  
-        self.plex_token = {"X-Plex-Token": plex_token}  
-        if execute_request:  # 检查是否需要执行请求
-            response = requests.get(self.plex_url, headers=self.plex_token)
+        self.plex_token = plex_token
+        self.headers = {
+            "X-Plex-Token": self.plex_token,
+            "Accept": "application/json",
+        }
+        if execute_request:  
+            response = requests.get(self.plex_url, headers=self.headers)
             if response.status_code == 200:
                 logger.info("Successfully connected to the Plex server.")
             else:
@@ -27,328 +31,84 @@ class PlexApi:
         self.class_name = type(self).__name__
         logger.info(f"{self.class_name} initialised")
 
-        """
-        初始化PlexApi类的实例。
-        :param plex_url: Plex服务器的URL。
-        :param plex_token: 用于访问Plex服务器的令牌。
-        :param execute_request: 是否在初始化时执行请求以测试连接。
-        """
-   
-    def get_keys_from_plex_api(self, plex_endpoint: str) -> List[Dict]:
-        """
-        从Plex API获取关键信息。
-        :param plex_endpoint: Plex API的端点。
-        :return: 包含所有提取信息的列表。
-        """
+    def get_keys_from_plex_api(self, plex_endpoint: str) -> list:
         api_url = self.plex_url + plex_endpoint
-        response = requests.get(url=api_url, params=self.plex_token)
-        plex_keys = self.extract_keys_from_xml(response_content=response.content)
+        response = requests.get(url=api_url, headers=self.headers)
+        plex_keys = self.extract_keys_from_json(response.json())
         return plex_keys
-    
-    @staticmethod
-    def extract_keys_from_xml(response_content: bytes) -> List[Dict]:
-        """
-        从XML响应内容中提取关键信息。
-        :param response_content: XML响应内容，为字节字符串。
-        :return: 包含所有提取信息的列表。
-        """
-        all_contents = []
-        response_xml_root = ElementTree.fromstring(response_content)
-        for child in response_xml_root:
-            content_details = {}
-            for attr, value in child.attrib.items():
-                content_details[attr] = value
-            all_contents.append(content_details)
-        return all_contents
-        
-    def search_movie(self, title):
-        """
-        搜索电影。
-        :param title: 电影的标题。
-        :return: 如果找到匹配的电影，则返回电影的详细信息，否则返回None。
-        """    
-        # 构造搜索电影的API请求
-        search_endpoint = f"/search?query={title}"
-        search_url = self.plex_url + search_endpoint
-
-        # 发送请求并获取响应
-        response = requests.get(search_url, headers=self.plex_token)
-        movies = self.extract_keys_from_xml(response.content)
-
-        # 在响应中查找与提供的年份匹配的电影
-        for movie in movies:
-            # 打印出每个电影的键
-            details = self.get_movie_details(movie)
-            # 打印详细信息
-            logger.debug("此处获取的信息是：", details)
-            return details
-
-        # 如果没有找到匹配的电影，返回None
-        return None
-
-
+           
     def search_show(self, title, year=None):
-        """
-        搜索电视节目。
-        :param title: 电视节目的标题。
-        :param year: 电视节目的年份。如果没有提供，将只根据标题来匹配电视节目。
-        :return: 如果找到匹配的电视节目，则返回电视节目的详细信息，否则返回None。
-        """
-        # 构造搜索电视节目的API请求
         search_endpoint = f"/search?query={title}"
         search_url = self.plex_url + search_endpoint
-
-        # 发送请求并获取响应
-        response = requests.get(search_url, headers=self.plex_token)
-        shows = self.extract_keys_from_xml(response.content)
-
-        # 在响应中查找与提供的标题和年份（如果有）匹配的电视节目
-        for show in shows:
-            if year is None or ('year' in show and show['year'] == year):
-                # 获取该电视节目的key
-                # 打印该电视节目的标题和年份
-                logger.debug(f"Found show: {show['title']} ({show['year']})")
-                # 调用get_show_details函数根据key获取电视节目的详细信息
-                show_details = self.get_show_details(show)
-                # 返回电视节目的详细信息
-                return show_details
-
-        # 如果没有找到匹配的电视节目，返回None
+        response = requests.get(search_url, headers=self.headers)
+        shows = response.json()
+        if 'Metadata' in shows['MediaContainer']:
+            for show in shows['MediaContainer']['Metadata']:
+                if year:
+                    # 如果年份也提供了，那么检查标题和年份是否都匹配
+                    if show.get('title') == title and show.get('year') == int(year):
+                        show_details = self.get_show_details(show)
+                        return show_details
+                elif show.get('title') == title:
+                    # 如果没有提供年份，那么只检查标题是否匹配
+                    show_details = self.get_show_details(show)
+                    print(show_details)
+                    return show_details
+        print("未发现媒体")
         return None
 
-
-    def get_show_details(self, show: str) -> Dict:
-        """
-        获取特定剧集的详细信息。
-        :param show_key: API的端点。
-        :return: 包含特定剧集详细信息的字典。
-        """
-        # 构造获取特定剧集的API请求的URL
+    def get_show_details(self, show: str) -> dict:
         plex_endpoint = "/library/metadata/" + show['ratingKey']
         api_url = self.plex_url + plex_endpoint
-        logger.debug(f"Constructed URL: {api_url}")  # 打印构造的链接
-        
-        # 发送请求并获取响应
-        response = requests.get(url=api_url, params=self.plex_token)
-        
-        # 解析XML响应内容
-        response_xml_root = ElementTree.fromstring(response.content)
-        
-        # 初始化一个空字典来存储电视节目的详细信息
+        logger.debug(f"Constructed URL: {api_url}")  
+        response = requests.get(url=api_url, headers=self.headers)
+        response_json = response.json()
         show_details = {'title': None, 'year': None, 'tmdbid': None}
-        # 从XML响应内容中提取电视节目的标题，年份，tmdbid和key
-        for child in response_xml_root.iter('Directory'):
-            show_details['title'] = child.attrib.get('title')
-            show_details['year'] = child.attrib.get('year')
-
-        for guid in response_xml_root.iter('Guid'):
-            id_value = guid.attrib.get('id')
-            if id_value and id_value.startswith('tmdb://'):
-                show_details['tmdbid'] = id_value.split('://')[1]
-
-        # 打印获取到的电视节目的详细信息
-        logger.debug(f"Got show details: {show_details}")  # 打印输出
-        # 返回电视节目的详细信息
+        for child in response_json['MediaContainer']['Metadata']:
+            show_details['title'] = child.get('title')
+            show_details['year'] = child.get('year')
+            for guid_dict in child.get('Guid', []):
+                id_value = guid_dict.get('id')
+                if id_value and id_value.startswith('tmdb://'):
+                    show_details['tmdbid'] = id_value.split('://')[1]
+        logger.debug(f"Got show details: {show_details}")  
         return show_details
 
+    def search_movie(self, title, year=None):
+        search_endpoint = f"/search?query={title}"
+        search_url = self.plex_url + search_endpoint
+        response = requests.get(search_url, headers=self.headers)
+        movies = response.json()
+        if 'Metadata' in movies['MediaContainer']:
+            for movie in movies['MediaContainer']['Metadata']:
+                if year:
+                    if movie.get('title') == title and movie.get('year') == int(year):
+                        details = self.get_movie_details(movie)
+                        logger.info("此处获取的信息是：", details)
+                        return details
+                elif movie.get('title') == title:
+                    print(movie)
+                    movie_details = self.get_movie_details(movie)
+                    return movie_details
+        print("未发现媒体")
+        return None
 
-
-    def get_movie_details(self, movie):
-        """
-        获取电影的详细信息。
-        :param movie: 电影对象。
-        :return: 包含电影详细信息的字典。
-        """
+    def get_movie_details(self, movie: str) -> dict:
         plex_endpoint = movie['key']
         api_url = self.plex_url + plex_endpoint
-        response = requests.get(url=api_url, params=self.plex_token)
-        logger.debug(f"Constructed URL: {api_url}")  # 打印构造的链接
-        response_xml_root = ElementTree.fromstring(response.content)
-        
-        media_details = {}
-        for child in response_xml_root:
-            for attr, value in child.attrib.items():
-                media_details[attr] = value
-        
-        # 提取tmdbid中的数字部分
-        for guid in response_xml_root.iter('Guid'):
-            id_value = guid.attrib.get('id')
-            if id_value and id_value.startswith('tmdb://'):
-                media_details['tmdbid'] = id_value.split('://')[1]
-
-        # 打印获取到的所有信息
+        response = requests.get(url=api_url, headers=self.headers)
+        logger.info(f"Constructed URL: {api_url}")  
+        response_json = response.json()
+        media_details = {'title': None, 'year': None, 'tmdbid': None}
+        for child in response_json['MediaContainer']['Metadata']:
+            media_details['title'] = child.get('title')
+            media_details['year'] = child.get('year')
+            for guid_dict in child.get('Guid', []):
+                id_value = guid_dict.get('id')
+                if id_value and id_value.startswith('tmdb://'):
+                    media_details['tmdbid'] = id_value.split('://')[1]
         logger.debug("此处获取的所有信息是：", media_details)
-        
         return media_details
-    
-    def get_all_episode_details(self, endpoint: str) -> List[Dict]:
-        """
-        获取所有剧集的详细信息。
-        :param endpoint: API的端点。
-        :return: 包含所有剧集详细信息的列表。
-        """
-
-        print(f"Getting all episode details for endpoint: {endpoint}")  # 打印输入
-        api_url = self.plex_url + endpoint
-        response = requests.get(url=api_url, params=self.plex_token)
-        
-        response_xml_root = ElementTree.fromstring(response.content)
-        
-        all_episodes = []
-        for child in response_xml_root:
-            if child.attrib.get("type") == "episode":
-
-                episode_details = {
-                    "title"    : child.attrib.get("title"),
-                    "type"     : child.attrib.get("type"),
-                    "updatedAt": child.attrib.get("updatedAt"),
-                    "addedAt"  : child.attrib.get("addedAt"),
-                    "year"     : child.attrib.get("year"),
-                    "key"      : child.attrib.get("key")
-                }
-
-                # 提取tmdbid中的数字部分
-                tmdbids = []
-                for guid_child in child.iter("Guid"):
-                    guid_id = guid_child.attrib.get("id")
-                    if 'tmdb://' in guid_id:
-                        tmdbid = guid_id.split('://')[1]
-                        tmdbids.append(tmdbid)
-                episode_details["tmdbids"] = tmdbids
-
-                all_episodes.append(episode_details)
-        print(f"Got all episode details: {all_episodes}")  # 打印输出
-        return all_episodes
-
-
-    
-    def update_all_library_sections(self) -> bool:
-        """
-        刷新Plex服务器上的所有库区域。
-        :return: 如果刷新成功，则返回True，否则返回False。
-        """
-        # Sections
-        logger.info("Getting library sections")
-        library_sections = self.get_keys_from_plex_api(plex_endpoint="/library/sections")
-        for section in library_sections:
-            section_endpoint = f"/library/sections/{section['key']}/refresh"
-            api_uri = self.plex_url + section_endpoint
-            response = requests.get(api_uri, params=self.plex_token)
-            if response.status_code == 200:
-                logger.success(f"Successfully started refresh for {section['title']}")
-            else:
-                raise ConnectionError(f"Refresh failed for {section['title']}")
-        return True
-    
-    def get_all_show_details(self, show_endpoint: str) -> Dict:
-        """
-        获取所有电视节目的详细信息。
-        :param show_endpoint: API的端点。
-        :return: 包含所有电视节目详细信息的字典。
-        """
-        api_url = self.plex_url + show_endpoint
-        response = requests.get(url=api_url, params=self.plex_token)
-        print(f"Constructed URL: {api_url}")  # 打印构造的链接
-        response_xml_root = ElementTree.fromstring(response.content)
-        show_details = {
-            "show_summary": response_xml_root.attrib.get("summary"),
-            "show_title1" : response_xml_root.attrib.get("title2"),
-            "show_title2" : response_xml_root.attrib.get("title1"),
-            "year"        : response_xml_root.attrib.get("parentYear"),
-            "key"         : show_endpoint
-        }
-        all_season_details = []
-        all_episode_details = []
-        for child in response_xml_root:
-            if child.attrib.get("type") == "season":
-
-                season_details = {
-                    "title"    : child.attrib.get("title"),
-                    "type"     : child.attrib.get("type"),
-                    "updatedAt": child.attrib.get("updatedAt"),
-                    "addedAt"  : child.attrib.get("addedAt"),
-                    "key"      : child.attrib.get("key")
-                }
-
-                all_season_details.append(season_details)
-
-                episodes_endpoint = child.attrib.get("key")
-                all_episode_details.append(self.get_all_episode_details(endpoint=episodes_endpoint))
-            # 新增一个功能，从XML响应内容中提取电视节目的tmdbid
-            if child.attrib.get("type") == "show":
-                for guid in child.iter("Guid"):
-                    id_value = guid.attrib.get("id")
-                    if id_value and id_value.startswith("tmdb://"):
-                        show_details["tmdbid"] = id_value.split("://")[1]
-        show_details["season_details"] = all_season_details
-        show_details["episode_details"] = all_episode_details
-        return show_details
-
-    def get_section_contents(self, content: Dict) -> Dict:
-        """
-        获取库区域的内容。
-        :param content: 内容对象。
-        :return: 包含库区域内容的字典。
-        """
-        content_key = content.get("key")
-        content_type = content.get("type")
-        if content_type == "movie":
-            return self.get_movie_details(content_key)
-        elif content_type == "show":
-            return self.get_all_show_details(content_key)
-
-    def get_plex_section_content(self, library_section_name: str):
-        """
-        获取Plex库区域的内容。
-        :param library_section_name: 库区域的名称。
-        :return: 包含库区域内容的字典。
-        """
-        library_section = [section for section in self.get_keys_from_plex_api(plex_endpoint="/library/sections") if
-                           section['title'] == library_section_name]
-
-        if len(library_section) > 0:
-            section_details = library_section[0]
-        else:
-            logger.error(f"No results found for section {library_section_name}")
-            return
-
-        section_endpoint = f"/library/sections/{section_details['key']}/all"
-        section_contents = self.get_keys_from_plex_api(section_endpoint)
-
-        return [self.get_section_contents(section_contents[i]) for i in tqdm(range(len(section_contents)))]
-
-    def get_movie_info(self):
-        """
-        获取电影信息。
-        :return: 包含电影信息的字典。
-        """
-        logger.info("Getting movie info")
-        return self.get_plex_section_content("Movies")
-
-    def get_show_info(self):
-        """
-        获取电视节目信息。
-        :return: 包含电视节目信息的字典。
-        """
-        logger.info("Getting show info")
-        return self.get_plex_section_content("TV Shows")
-
-    def get_all_plex_info(self) -> (Dict):
-        """
-        获取所有Plex信息。
-        :return: 包含所有Plex信息的字典。
-        """
-        
-        # Sections
-        
-        logger.info("Getting library sections")
-
-        all_data = {}
-
-        all_data["movies"] = self.get_movie_info()
-        all_data["shows"] = self.get_show_info()
-
-        return all_data
 
 # 定义TMDBApi类
 class TMDBApi:
