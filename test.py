@@ -16,7 +16,15 @@ def get_file_info(file_path):
     elements_regex = {
         "year": r'\b(19[0-9]{2}|20[0-5][0-9])\b',
         "resolution": r'(\d{3}P|\dK)',
-        # ...省略了一些代码...
+
+        "source": r'\b(REMUX|BDREMUX|BD-REMUX|BLURAY|BD|BLU-RAY|BD1080P|BDRIP|WEB|WEB-DL|WEBDL|WEBRIP|HR-HDTV|HRHDTV|HDTV|HDRIP|DVDRIP|DVDSCR|DVD|HDTC|TC|HQCAM|HQ-CAM|CAM|TS)\b',
+        "codec": r'\b(X264|X265|H\.264|H\.265|HEVC|VP8|VP9|AV1|VC1|MPEG1|MPEG2|MPEG-4|Theora|ProRes)\b',
+        "bit_depth": r'\b\d{1,2}BIT\b',
+        "hdr_info": r'\b(SDR|HDR|HDR10|DOLBY VISION|HDR10+|HLG|DISPLAYHDR)\b',
+        "audio_format": r'\b(MP3|AAC|WAV|FLAC|ALAC|APE|LPCM)\b',
+        "audio_standard": r'\b(DTS-HD MA|DTS-HD HR|DTS:X|AC-3 EX|E-AC-3|TRUEHD|ATMOS|DTS|DD\+|AC3|DD|EX|DDL|7 1|5 1|DTS-HD\.MA\.TrueHD\.7\.1\.Atmos)\b',
+        "edit_version": r'\b(PROPER|REPACK|LIMITED|DUPE|IMAX|UNRATE|R-RATE|SE|DC|WITH EXTRAS|RERIP|SUBBED|DIRECTOR\'S CUT|THEATRICAL CUT|ANNIVERSARY EDITION|CEE|EUR|US|NODIC|UK|FRA|GRE|HK|TW|JPN|KR|REMASTERED|OPEN MATTE)\b'
+    }
     }
 
     elements = {key: None for key in elements_regex.keys()}
