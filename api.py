@@ -5,7 +5,7 @@
 import json
 import requests
 from xml.etree import ElementTree
-from typing import List, Dict
+from typing import  Union, List, Dict
 from tqdm import tqdm
 from config import ConfigManager
 
