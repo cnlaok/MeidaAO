@@ -5,10 +5,10 @@
 import json
 import requests
 from xml.etree import ElementTree
-from typing import List, Dict
+from typing import  Union, List, Dict
 from tqdm import tqdm
 from config import ConfigManager
-
+import time
 
 class PlexApi:
     def __init__(self, plex_url: str, plex_token: str, execute_request: bool = True):
@@ -46,7 +46,7 @@ class PlexApi:
                         return show_details
                 elif show.get('title') == title:
                     show_details = self.get_show_details(show)
-                    print(show_details)
+                    #print(show_details)
                     return show_details
         print("\033[91m未发现媒体\033[0m")
         return None
@@ -54,7 +54,7 @@ class PlexApi:
     def get_show_details(self, show: str) -> dict:
         plex_endpoint = "/library/metadata/" + show['ratingKey']
         api_url = self.plex_url + plex_endpoint
-        print(f"Constructed URL: {api_url}")  
+        #print(f"Constructed URL: {api_url}")  
         response = requests.get(url=api_url, headers=self.headers)
         response_json = response.json()
         show_details = {'title': None, 'year': None, 'tmdbid': None}
@@ -65,7 +65,7 @@ class PlexApi:
                 id_value = guid_dict.get('id')
                 if id_value and id_value.startswith('tmdb://'):
                     show_details['tmdbid'] = id_value.split('://')[1]
-        print(f"Got show details: {show_details}")  
+        #print(f"Got show details: {show_details}")  
         return show_details
 
     def search_movie(self, title: str, year: Union[str, None] = None) -> Union[Dict[str, str], None]:
@@ -78,10 +78,10 @@ class PlexApi:
                 if year:
                     if movie.get('title') == title and movie.get('year') == int(year):
                         details = self.get_movie_details(movie)
-                        print("此处获取的信息是：", details)
+                        #print("此处获取的信息是：", details)
                         return details
                 elif movie.get('title') == title:
-                    print(movie)
+                    #print(movie)
                     movie_details = self.get_movie_details(movie)
                     return movie_details
         print("\033[91m未发现媒体\033[0m")
@@ -91,7 +91,7 @@ class PlexApi:
         plex_endpoint = movie['key']
         api_url = self.plex_url + plex_endpoint
         response = requests.get(url=api_url, headers=self.headers)
-        print(f"Constructed URL: {api_url}")  
+        #print(f"Constructed URL: {api_url}")  
         response_json = response.json()
         media_details = {}
         for child in response_json['MediaContainer']['Metadata']:
@@ -103,7 +103,7 @@ class PlexApi:
                             media_details['tmdbid'] = id_value.split('://')[1]
                 else:
                     media_details[key] = value
-        print("此处获取的所有信息是：", media_details)
+        #print("此处获取的所有信息是：", media_details)
         return media_details
 
 # 定义TMDBApi类
@@ -122,6 +122,26 @@ class TMDBApi:
         """
         self.key = key
         self.api_url = "https://api.themoviedb.org/3"
+
+    def send_request(self, url, params):
+        max_retries = 3  # 设置最大重试次数
+        retry_delay = 5  # 设置每次重试之间的延迟（以秒为单位）
+
+        for i in range(max_retries):
+            try:
+                r = requests.get(url, params=params)
+                # 如果请求成功，则跳出循环
+                break
+            except requests.exceptions.RequestException as e:
+                print(f"请求失败: {e}")
+                # 如果达到最大重试次数，则抛出异常
+                if i == max_retries - 1:
+                    raise
+                # 否则，等待一段时间后再次尝试
+                print(f"等待 {retry_delay} 秒后重试...")
+                time.sleep(retry_delay)
+
+        return r.json()
 
     # 根据提供的id获取剧集信息
     def tv_info(self, tv_id: str, language: str = 'zh-CN', silent: bool = False) -> dict:
@@ -181,11 +201,16 @@ class TMDBApi:
             post_params = dict(api_key=self.key, query=keyword, language=language)
 
             # 发送GET请求并获取响应
-            r = requests.get(post_url, params=post_params)
-
-            # 将响应转换为JSON格式，并添加状态码到返回数据中
-            return_data = r.json()
-            return_data['request_code'] = r.status_code
+            try:
+                # 发送GET请求并获取响应
+                r = requests.get(post_url, params=post_params)
+                # 将响应转换为JSON格式，并添加状态码到返回数据中
+                return_data = r.json()
+                return_data['request_code'] = r.status_code
+            except requests.exceptions.RequestException as e:
+                # 如果出错，打印错误信息并跳过
+                print(f"请求出错，错误信息：{e}")
+                return None
 
             # 如果silent为True，则直接返回数据，否则打印请求结果
             if silent:
@@ -207,11 +232,13 @@ class TMDBApi:
 
             # 格式化并打印搜索结果
             print(f"{success_msg} 关键词[{keyword}]查找结果如下: ")
-            print("{:<8}{:^14}{}".format(" 首播时间 ", "序号", "剧 名"))
-            print("{:<12}{:^16}{}".format("----------", "-----", "----------------"))
+            print("{:<8}{:^14}{:^6}{}".format(" 首播时间 ", "序号", "TMDB ID", "剧 名"))
+            print("{:<12}{:^16}{:^8}{}".format("----------", "-----", "-------", "----------------"))
 
             for i, result in enumerate(return_data['results']):
-                print("{:<12}{:^16}{}".format(result['first_air_date'], i, result['name']))
+                print("{:<12}{:^16}{:^8}{}".format(result['first_air_date'], i, result['id'], result['name']))
+
+
 
             # 返回搜索结果
             return return_data
@@ -313,11 +340,16 @@ class TMDBApi:
         post_params = dict(api_key=self.key, query=keyword, language=language)
 
         # 发送GET请求并获取响应
-        r = requests.get(post_url, params=post_params)
-
-        # 将响应转换为JSON格式，并添加状态码到返回数据中
-        return_data = r.json()
-        return_data['request_code'] = r.status_code
+        try:
+            # 发送GET请求并获取响应
+            r = requests.get(post_url, params=post_params)
+            # 将响应转换为JSON格式，并添加状态码到返回数据中
+            return_data = r.json()
+            return_data['request_code'] = r.status_code
+        except requests.exceptions.RequestException as e:
+            # 如果出错，打印错误信息并跳过
+            print(f"请求出错，错误信息：{e}")
+            return None
 
         # 如果silent为True，则直接返回数据，否则打印请求结果
         if silent:
@@ -339,11 +371,11 @@ class TMDBApi:
 
         # 格式化并打印搜索结果
         print(f"{success_msg} 关键词[{keyword}]查找结果如下: ")
-        print("{:<8}{:^14}{}".format(" 首播时间 ", "序号", "电影标题"))
-        print("{:<12}{:^16}{}".format("----------", "-----", "----------------"))
+        print("{:<8}{:^14}{:^6}{}".format(" 首播时间 ", "序号", "ID", "电影标题"))
+        print("{:<12}{:^16}{:^8}{}".format("----------", "-----", "-------", "----------------"))
 
         for i, result in enumerate(return_data['results']):
-            print("{:<12}{:^16}{}".format(result['release_date'], i, result['title']))
+            print("{:<12}{:^16}{:^8}{}".format(result['release_date'], i, result['id'], result['title']))
 
         # 返回搜索结果
         return return_data

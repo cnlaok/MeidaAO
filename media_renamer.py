@@ -103,7 +103,37 @@ class MediaRenamer:
         else:
             print("文件夹无需修改")
 
-    def match_mode_1(self, parent_folder_path: str, library_type_index: int, naming_rule_index: int):
+    def move_folder(self, library_type_index: int, config_manager: ConfigManager):
+        # 根据库的类型确定目标文件夹
+        if library_type_index == 1:
+            target_folder = config_manager.movies_folder
+        else:
+            print("请选择要移动到的文件夹：")
+            print("1. 剧集")
+            print("2. 动漫")
+            print("3. 国剧")
+            print("4. 纪录")
+            print("5. 美剧")
+            print("6. 日韩剧")
+            print("7. 体育")
+            print("8. 综艺")
+            folder_index = int(input("请输入你选择的文件夹编号（默认为1）:") or "1")
+            target_folder = {
+                1: config_manager.shows_folder,
+                2: config_manager.anime_folder,
+                3: config_manager.chinese_drama_folder,
+                4: config_manager.documentary_folder,
+                5: config_manager.american_drama_folder,
+                6: config_manager.japanese_korean_drama_folder,
+                7: config_manager.sports_folder,
+                8: config_manager.variety_show_folder
+            }.get(folder_index, config_manager.shows_folder)
+        return target_folder
+
+    def match_mode_1(self, parent_folder_path: str, library_type_index: int, naming_rule_index: int, config_manager: ConfigManager):
+        move_all_folders = input("是否要移动所有匹配的文件夹？(y/n，默认为y)：")
+        if move_all_folders.lower() == 'y' or not move_all_folders:
+            target_folder = self.move_folder(library_type_index, config_manager)
         for folder_name in os.listdir(parent_folder_path):
             folder_path = os.path.join(parent_folder_path, folder_name)
             print(f"正在处理文件夹：{folder_path}")
@@ -116,24 +146,33 @@ class MediaRenamer:
             if library_type_index == 1:
                 print(f"正在搜索电影中：{title} ({year})")
                 matched_content = self.plex_api.search_movie(title)
-                if matched_content:
-                    print(f"从库中获取电影: {matched_content['title']} ({matched_content['year']}) {{tmdbid-{matched_content['tmdbid']}}}")
-                    tmdb_id = matched_content['tmdbid']
-                    new_folder_name = self.generate_new_folder_name(matched_content['title'], matched_content['year'], tmdb_id, naming_rule_index)
-                    self.process_folder(folder_path, new_folder_name, matched_content)
             elif library_type_index == 2:
                 print(f"正在搜索剧集中：{title} ({year})")
                 matched_content = self.plex_api.search_show(title, year)
-                if matched_content:
-                    print(f"从库中获取剧集: {matched_content['title']} ({matched_content['year']}) {{tmdbid-{matched_content['tmdbid']}}}")
-                    tmdb_id = matched_content['tmdbid']
-                    new_folder_name = self.generate_new_folder_name(matched_content['title'], matched_content['year'], tmdb_id, naming_rule_index)
-                    self.process_folder(folder_path, new_folder_name, matched_content)
 
-    def match_mode_2(self, parent_folder_path: str, library_type_index: int, naming_rule_index: int):
+            if matched_content:
+                print(f"从库中获取内容: {matched_content['title']} ({matched_content['year']}) {{tmdbid-{matched_content['tmdbid']}}}")
+                tmdb_id = matched_content['tmdbid']
+                new_folder_name = self.generate_new_folder_name(matched_content['title'], matched_content['year'], tmdb_id, naming_rule_index)
+                new_folder_path = os.path.join(parent_folder_path, new_folder_name)  # 新添加的代码行
+                self.process_folder(folder_path, new_folder_name, matched_content)
+                if move_all_folders.lower() == 'y':
+                    target_path = os.path.join(target_folder, new_folder_name)
+                    if not os.path.exists(target_path):
+                        try:
+                            os.rename(new_folder_path, target_path)
+                            print(f"文件夹已成功移动到：{target_path}")
+                        except OSError as e:
+                            print(f"Error moving folder: {e}")
+
+
+    def match_mode_2(self, parent_folder_path: str, library_type_index: int, naming_rule_index: int, config_manager: ConfigManager):
+        move_all_folders = input("是否要移动所有匹配的文件夹？(y/n，默认为y)：")
+        if move_all_folders.lower() == 'y' or not move_all_folders:
+            target_folder = self.move_folder(library_type_index, config_manager)
         for folder_name in os.listdir(parent_folder_path):
             folder_path = os.path.join(parent_folder_path, folder_name)
-            print(f"Processing folder: {folder_path}")
+            print(f"正在处理文件夹：{folder_path}")
             if folder_path in self.processed_folders:
                 continue
 
@@ -141,23 +180,47 @@ class MediaRenamer:
 
             matched_content = None
             if library_type_index == 1:
-                print(f"Searching in movies: {title} ({year})")
+                print(f"正在搜索电影中：{title} ({year})")
                 matched_content = self.tmdb_api.search_movie(title)
-                if matched_content and matched_content['results']:
-                    matched_movie = matched_content['results'][0]
-                    print(f"Found in TMDB: {matched_movie['title']} ({matched_movie['release_date'][:4]}) {{tmdb-{matched_movie['id']}}}")
-                    tmdb_id = matched_movie['id']
-                    new_folder_name = self.generate_new_folder_name(matched_movie['title'], matched_movie['release_date'][:4], tmdb_id, naming_rule_index)
-                    self.process_folder(folder_path, new_folder_name, matched_movie)
+                # 如果搜索结果为空，提示用户手动输入
+                if matched_content is None:
+                    title = input("未找到匹配的电影。请手动输入标题（留空表示跳过）：")
+                    year = input("请手动输入年份（留空表示跳过）：")
+                    # 如果用户输入不为空，再次进行搜索
+                    if title and year:
+                        matched_content = self.tmdb_api.search_movie(title)
             elif library_type_index == 2:
-                print(f"Searching in TV shows: {title} ({year})")
+                print(f"正在搜索剧集中：{title} ({year})")
                 matched_content = self.tmdb_api.search_tv(title)
-                if matched_content and matched_content['results']:
-                    matched_show = matched_content['results'][0]
-                    print(f"Found in TMDB: {matched_show['name']} ({matched_show['first_air_date'][:4]}) {{tmdb-{matched_show['id']}}}")
-                    tmdb_id = matched_show['id']
-                    new_folder_name = self.generate_new_folder_name(matched_show['name'], matched_show['first_air_date'][:4], tmdb_id, naming_rule_index)
-                    self.process_folder(folder_path, new_folder_name, matched_show)
+                # 如果搜索结果为空，提示用户手动输入
+                if matched_content is None:
+                    title = input("未找到匹配的剧集。请手动输入标题（留空表示跳过）：")
+                    year = input("请手动输入年份（留空表示跳过）：")
+                    # 如果用户输入不为空，再次进行搜索
+                    if title and year:
+                        matched_content = self.tmdb_api.search_tv(title)
+
+            if matched_content and matched_content['results']:
+                # 获取匹配到的第一部电影或剧集的信息
+                first_matched_content = matched_content['results'][0]
+
+                # 从电影或剧集信息中获取标题、年份和TMDB ID
+                title = first_matched_content['title'] if library_type_index == 1 else first_matched_content['name']
+                year = first_matched_content['release_date'][:4] if library_type_index == 1 else first_matched_content['first_air_date'][:4]
+                tmdb_id = first_matched_content['id']
+
+                print(f"从库中获取内容: {title} ({year}) {{tmdbid-{tmdb_id}}}")
+                new_folder_name = self.generate_new_folder_name(title, year, tmdb_id, naming_rule_index)
+                new_folder_path = os.path.join(parent_folder_path, new_folder_name)  # 新添加的代码行
+                self.process_folder(folder_path, new_folder_name, matched_content)
+                if move_all_folders.lower() == 'y':
+                    target_path = os.path.join(target_folder, new_folder_name)
+                    if not os.path.exists(target_path):
+                        try:
+                            os.rename(new_folder_path, target_path)
+                            print(f"文件夹已成功移动到：{target_path}")
+                        except OSError as e:
+                            print(f"Error moving folder: {e}")
 
     def match_mode_3(self, parent_folder_path: str, library_type_index: int, naming_rule_index: int):
         for folder_name in os.listdir(parent_folder_path):

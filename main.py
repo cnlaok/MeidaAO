@@ -2,7 +2,7 @@
 # @Time : 2023/11/03
 # @File : main.py
 
-from typing import Tuple, Union
+from typing import Tuple, Union, List, Dict
 from media_renamer import MediaRenamer
 from config import ConfigManager
 from api import TMDBApi, PlexApi
@@ -42,9 +42,9 @@ def main() -> None:
         exit()
 
     if match_mode_index == 1:
-        media_renamer.match_mode_1(parent_folder_path, library_type_index, naming_rule_index)
+        media_renamer.match_mode_1(parent_folder_path, library_type_index, naming_rule_index, config_manager)
     elif match_mode_index == 2:
-        media_renamer.match_mode_2(parent_folder_path, library_type_index, naming_rule_index)
+        media_renamer.match_mode_2(parent_folder_path, library_type_index, naming_rule_index, config_manager)
     elif match_mode_index == 3:
         media_renamer.match_mode_3(parent_folder_path, naming_rule_index)
 
