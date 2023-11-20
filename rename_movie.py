@@ -1,3 +1,7 @@
+# -*- coding: utf-8 -*-
+# @Time : 2023/11/19
+# @File : rename_movie.py
+
 import os
 import re
 import json

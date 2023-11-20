@@ -1,21 +1,17 @@
 # -*- coding: utf-8 -*-
 # @Time : 2023/11/03
 # @File : api.py
+
 import json
 import requests
 from xml.etree import ElementTree
 from typing import List, Dict
 from tqdm import tqdm
-from logger import LoggerManager
 from config import ConfigManager
 
-logger_manager = LoggerManager()
-logger = logger_manager.logger   
-handler_to_remove = logger.handlers[0] 
-logger.removeHandler(handler_to_remove)
 
 class PlexApi:
-    def __init__(self, plex_url, plex_token, execute_request=True):
+    def __init__(self, plex_url: str, plex_token: str, execute_request: bool = True):
         self.plex_url = plex_url  
         self.plex_token = plex_token
         self.headers = {
@@ -25,11 +21,11 @@ class PlexApi:
         if execute_request:  
             response = requests.get(self.plex_url, headers=self.headers)
             if response.status_code == 200:
-                logger.info("Successfully connected to the Plex server.")
+                print("Successfully connected to the Plex server.")
             else:
-                logger.info("Failed to connect to the Plex server.")
+                print("Failed to connect to the Plex server.")
         self.class_name = type(self).__name__
-        logger.info(f"{self.class_name} initialised")
+        print(f"{self.class_name} initialised")
 
     def get_keys_from_plex_api(self, plex_endpoint: str) -> list:
         api_url = self.plex_url + plex_endpoint
@@ -37,7 +33,7 @@ class PlexApi:
         plex_keys = self.extract_keys_from_json(response.json())
         return plex_keys
            
-    def search_show(self, title, year=None):
+    def search_show(self, title: str, year: Union[str, None] = None) -> Union[Dict[str, str], None]:
         search_endpoint = f"/search?query={title}"
         search_url = self.plex_url + search_endpoint
         response = requests.get(search_url, headers=self.headers)
@@ -45,22 +41,20 @@ class PlexApi:
         if 'Metadata' in shows['MediaContainer']:
             for show in shows['MediaContainer']['Metadata']:
                 if year:
-                    # 如果年份也提供了，那么检查标题和年份是否都匹配
                     if show.get('title') == title and show.get('year') == int(year):
                         show_details = self.get_show_details(show)
                         return show_details
                 elif show.get('title') == title:
-                    # 如果没有提供年份，那么只检查标题是否匹配
                     show_details = self.get_show_details(show)
                     print(show_details)
                     return show_details
-        print("未发现媒体")
+        print("\033[91m未发现媒体\033[0m")
         return None
 
     def get_show_details(self, show: str) -> dict:
         plex_endpoint = "/library/metadata/" + show['ratingKey']
         api_url = self.plex_url + plex_endpoint
-        logger.debug(f"Constructed URL: {api_url}")  
+        print(f"Constructed URL: {api_url}")  
         response = requests.get(url=api_url, headers=self.headers)
         response_json = response.json()
         show_details = {'title': None, 'year': None, 'tmdbid': None}
@@ -71,10 +65,10 @@ class PlexApi:
                 id_value = guid_dict.get('id')
                 if id_value and id_value.startswith('tmdb://'):
                     show_details['tmdbid'] = id_value.split('://')[1]
-        logger.debug(f"Got show details: {show_details}")  
+        print(f"Got show details: {show_details}")  
         return show_details
 
-    def search_movie(self, title, year=None):
+    def search_movie(self, title: str, year: Union[str, None] = None) -> Union[Dict[str, str], None]:
         search_endpoint = f"/search?query={title}"
         search_url = self.plex_url + search_endpoint
         response = requests.get(search_url, headers=self.headers)
@@ -84,30 +78,32 @@ class PlexApi:
                 if year:
                     if movie.get('title') == title and movie.get('year') == int(year):
                         details = self.get_movie_details(movie)
-                        logger.info("此处获取的信息是：", details)
+                        print("此处获取的信息是：", details)
                         return details
                 elif movie.get('title') == title:
                     print(movie)
                     movie_details = self.get_movie_details(movie)
                     return movie_details
-        print("未发现媒体")
+        print("\033[91m未发现媒体\033[0m")
         return None
 
     def get_movie_details(self, movie: str) -> dict:
         plex_endpoint = movie['key']
         api_url = self.plex_url + plex_endpoint
         response = requests.get(url=api_url, headers=self.headers)
-        logger.info(f"Constructed URL: {api_url}")  
+        print(f"Constructed URL: {api_url}")  
         response_json = response.json()
-        media_details = {'title': None, 'year': None, 'tmdbid': None}
+        media_details = {}
         for child in response_json['MediaContainer']['Metadata']:
-            media_details['title'] = child.get('title')
-            media_details['year'] = child.get('year')
-            for guid_dict in child.get('Guid', []):
-                id_value = guid_dict.get('id')
-                if id_value and id_value.startswith('tmdb://'):
-                    media_details['tmdbid'] = id_value.split('://')[1]
-        logger.debug("此处获取的所有信息是：", media_details)
+            for key, value in child.items():
+                if key == 'Guid':
+                    for guid_dict in value:
+                        id_value = guid_dict.get('id')
+                        if id_value and id_value.startswith('tmdb://'):
+                            media_details['tmdbid'] = id_value.split('://')[1]
+                else:
+                    media_details[key] = value
+        print("此处获取的所有信息是：", media_details)
         return media_details
 
 # 定义TMDBApi类
