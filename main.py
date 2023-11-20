@@ -2,7 +2,7 @@
 # @Time : 2023/11/03
 # @File : main.py
 
-from typing import Tuple, Union
+from typing import Tuple, Union, List, Dict
 from media_renamer import MediaRenamer
 from config import ConfigManager
 from api import TMDBApi, PlexApi
