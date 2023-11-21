@@ -1,153 +1,237 @@
-
-
-```python
 import os
-import re
+import time
 import json
-from api import PlexApi
-from config import ConfigManager
-import requests
-CONFIG_FILE = 'config.json' 
+from api import TMDBApi
+import colorama
+import re
+class LocalMediaRename:
+    def __init__(self, tmdb_key: str, debug: bool = True):
+        self.tmdb = TMDBApi(tmdb_key)
+        self.debug = debug
+        # ----Settings Start----
+        # TMDB 搜索语言
+        self.tmdb_language = "zh-CN"
+        # 文件重命名格式
+        self.tv_name_format = "{name}-S{season:0>2}E{episode:0>2}.{title}"
+        # 是否重命名父文件夹名称
+        self.media_folder_rename = False
+        # 是否创建对应季文件夹，并将剧集文件移动到其中
+        self.tv_season_dir = False
+        # 季度文件夹命名格式
+        self.tv_season_format = "Season {season}"
+        # 需要识别的视频及字幕格式
+        self.video_suffix_list = ['mp4', 'mkv', 'flv', 'avi', 'mpg', 'mpeg', 'mov']
+        self.subtitle_suffix_list = ['srt', 'ass', 'stl']
+        # ------Settings End------
 
-def get_file_info(file_path):
-    filename = os.path.basename(file_path).replace('.', ' ')
-    file_name_no_ext, file_ext = os.path.splitext(filename)
+    def rename_files(self, root_folder_path: str):
+        for folder_name in os.listdir(root_folder_path):
+            folder_path = os.path.join(root_folder_path, folder_name)
+            if os.path.isdir(folder_path):
+                match = re.search(r'(.*) \((\d{4})\) {tmdb-(\d+)}', folder_name)
+                if match:
+                    title, year, tmdb_id = match.groups()
+                    print(f"Title: {title}, Year: {year}, TMDB ID: {tmdb_id}")
+                    # 根据TMDB ID重命名文件
+                    self.tv_rename_id(tmdb_id, folder_path)
+                else:
+                    # 根据标题重命名文件
+                    self.tv_rename_keyword(title, folder_path)
 
-    elements_regex = {
-        "year": r'\b(19[0-9]{2}|20[0-5][0-9])\b',
-        "resolution": r'(\d{3}P|\dK)',
+    def tv_rename_id(self,
+                     tv_id: str,
+                     folder_path: str,
+                     folder_password=None,
+                     first_number: int = 1) -> dict:
+        """
+        根据TMDB剧集id获取剧集标题,并批量将指定文件夹中的视频文件及字幕文件重命名为剧集标题.
 
-        "source": r'\b(REMUX|BDREMUX|BD-REMUX|BLURAY|BD|BLU-RAY|BD1080P|BDRIP|WEB|WEB-DL|WEBDL|WEBRIP|HR-HDTV|HRHDTV|HDTV|HDRIP|DVDRIP|DVDSCR|DVD|HDTC|TC|HQCAM|HQ-CAM|CAM|TS)\b',
-        "codec": r'\b(X264|X265|H\.264|H\.265|HEVC|VP8|VP9|AV1|VC1|MPEG1|MPEG2|MPEG-4|Theora|ProRes)\b',
-        "bit_depth": r'\b\d{1,2}BIT\b',
-        "hdr_info": r'\b(SDR|HDR|HDR10|DOLBY VISION|HDR10+|HLG|DISPLAYHDR)\b',
-        "audio_format": r'\b(MP3|AAC|WAV|FLAC|ALAC|APE|LPCM)\b',
-        "audio_standard": r'\b(DTS-HD MA|DTS-HD HR|DTS:X|AC-3 EX|E-AC-3|TRUEHD|ATMOS|DTS|DD\+|AC3|DD|EX|DDL|7 1|5 1|DTS-HD\.MA\.TrueHD\.7\.1\.Atmos)\b',
-        "edit_version": r'\b(PROPER|REPACK|LIMITED|DUPE|IMAX|UNRATE|R-RATE|SE|DC|WITH EXTRAS|RERIP|SUBBED|DIRECTOR\'S CUT|THEATRICAL CUT|ANNIVERSARY EDITION|CEE|EUR|US|NODIC|UK|FRA|GRE|HK|TW|JPN|KR|REMASTERED|OPEN MATTE)\b'
-    }
-    }
+        :param tv_id: 剧集id
+        :param folder_path: 文件夹路径, 结尾必须加'/', 如/abc/test/
+        :param folder_password: 文件夹访问密码
+        :param first_number: 从指定集数开始命名, 如first_name=5, 则从第5集开始按顺序重命名
+        :return: 重命名请求结果
+        """
 
-    elements = {key: None for key in elements_regex.keys()}
+        if folder_path[-1] != '/':
+            folder_path += '/'
 
-    for key, regex in elements_regex.items():
-        matches = re.findall(regex, filename, re.IGNORECASE)
-        if matches:
-            elements[key] = ' '.join(matches)
-            for match in matches:
-                filename = filename.replace(match, '')
+        notice_msg = colorama.Fore.YELLOW + '[Notice!]' + colorama.Fore.RESET
 
-    chinese_title = re.search(r'《([^》]+)》', filename)
-    if chinese_title:
-        elements['title'] = chinese_title.group(1)
-        filename = filename.replace(chinese_title.group(0), '')
-    else:
-        chinese_title = re.search(r'[\u4e00-\u9fff]+', filename)
-        english_title = re.search(r'[a-zA-Z]+(\s[a-zA-Z]+)*', filename)
-        elements['title'] = chinese_title.group(0) if chinese_title else english_title.group(0) if english_title else None
+        # 设置返回数据
+        result = dict(success=False,
+                      args=dict(tv_id=tv_id,
+                                folder_path=folder_path,
+                                folder_password=folder_password,
+                                first_number=first_number),
+                      result=[])
 
-    if elements['title'] is None:
-        parent_folder_name = os.path.basename(os.path.dirname(file_path))
-        chinese_title = re.search(r'[\u4e00-\u9fff]+', parent_folder_name)
-        english_title = re.search(r'[a-zA-Z0-9_]+', parent_folder_name)
-        elements['title'] = chinese_title.group(0) if chinese_title else english_title.group(0) if english_title else None
+        # 根据剧集id 查找TMDB剧集信息
+        tv_info_result = self.tmdb.tv_info(tv_id, language=self.tmdb_language, silent=False)
+        result['result'].append(tv_info_result)
 
-    return elements
+        # 若查找失败则停止，并返回结果
+        if tv_info_result['request_code'] != 200:
+            return result
 
-def search_movie(plex_api, title, year=None):
-    search_endpoint = f"/search?query={title}"
-    search_url = plex_api.plex_url + search_endpoint
-    response = requests.get(search_url, headers=plex_api.headers)
-    movies = response.json()
+        # 若查找结果只有一项，则无需选择，直接进行下一步
+        if len(tv_info_result['seasons']) == 1:
+            # 获取剧集对应季每集标题
+            season_number = tv_info_result['seasons'][0]['season_number']
+            tv_season_info = self.tmdb.tv_season_info(
+                tv_id,
+                tv_info_result['seasons'][0]['season_number'],
+                language=self.tmdb_language,
+                silent=self.debug)
+            result['result'].append(tv_info_result)
+            # 若获取失败则停止， 并返回结果
+            if tv_season_info['request_code'] != 200:
+                failure_msg = colorama.Fore.RED + '\n[TvInfo●Failure]' + colorama.Fore.RESET
+                print(f"{failure_msg} 剧集id: {tv_id}\t{tv_info_result['name']} 第 {season_number} 季\n{tv_season_info['status_message']}")
+                return result
+        else:
+            # 获取到多项匹配结果，手动选择
+            while True:
+                season_number = input(f"{notice_msg} 该剧集有多季,请输入对应[序号], 输入[n]退出\t")
+                # active_number = list(range(len(tv_info_result['seasons'])))
+                # active_number = list(map(lambda x: str(x), active_number))
+                if season_number == 'n':
+                    result['result'].append("用户输入[n], 已主动退出选择剧集季数")
+                    return result
+                else:
+                    season_number = int(season_number)
+                    break
+                # else:
+                #     continue
 
-    if 'Metadata' in movies['MediaContainer']:
-        for media in movies['MediaContainer']['Metadata']:
-            extracted_info = {}
-            extracted_info['title'] = media.get('title')
-            extracted_info['year'] = media.get('year')
-            resolution = media.get('Media')[0].get('videoResolution')
-            extracted_info['resolution'] = resolution + 'P' if resolution != '4K' else resolution
-            bitrate_mbps = media.get('Media')[0].get('bitrate') / 8
-            if bitrate_mbps <= 5:
-                extracted_info['source'] = 'TS'
-            elif 5 < bitrate_mbps <= 10:
-                extracted_info['source'] = 'DVD'
-            elif 10 < bitrate_mbps <= 20:
-                extracted_info['source'] = 'HDTV'
-            elif 20 < bitrate_mbps <= 60:
-                extracted_info['source'] = 'BLURAY'
-            elif 60 < bitrate_mbps <= 80:
-                extracted_info['source'] = 'REMUX'
+            # 获取剧集对应季每集信息
+            for season_number in range(1, len(tv_info_result['seasons']) + 1):
+                tv_season_info = self.tmdb.tv_season_info(tv_id, season_number, language=self.tmdb_language, silent=self.debug)
+                result['result'].append(tv_season_info)
+                # 若获取失败则停止， 并返回结果
+                if tv_season_info['request_code'] != 200:
+                    failure_msg = colorama.Fore.RED + '\n[TvInfo●Failure]' + colorama.Fore.RESET
+                    print(f"{failure_msg} 剧集id: {tv_id}\t{tv_info_result['name']} 第 {season_number} 季\n{tv_season_info['status_message']}")
+                    return result
+
+                # 保存剧集标题
+                episodes = list(
+                    map(
+                        lambda x: self.tv_name_format.format(
+                            name=tv_info_result['name'], season=tv_season_info['season_number'], episode=x[
+                                'episode_number'], title=x['name']),
+                        tv_season_info['episodes']))
+
+                episodes = episodes[first_number - 1:]
+
+        file_list = os.listdir(folder_path)
+        video_list = list(
+            filter(lambda x: x.split(".")[-1] in ['mp4', 'mkv', 'flv', 'avi', 'mpg', 'mpeg', 'mov'],
+                   file_list))
+        subtitle_list = list(
+            filter(lambda x: x.split(".")[-1] in ['srt', 'ass', 'stl'],
+                   file_list))
+        video_rename_list = list(
+            map(
+                lambda x, y: dict(original_name=x,
+                                  target_name=y + '.' + x.split(".")[-1]),
+                video_list, episodes))
+        subtitle_rename_list = list(
+            map(
+                lambda x, y: dict(original_name=x,
+                                  target_name=y + '.' + x.split(".")[-1]),
+                subtitle_list, episodes))
+
+        print("The following video files will be renamed: ")
+        for video in video_rename_list:
+            print("{} -> {}".format(video['original_name'],
+                                    video['target_name']))
+        print("The following subtitle files will be renamed: ")
+        for subtitle in subtitle_rename_list:
+            print("{} -> {}".format(subtitle['original_name'],
+                                    subtitle['target_name']))
+
+        while True:
+            signal = input("Are you sure you want to rename? [Enter] to confirm, [n] to cancel\t")
+            if signal.lower() == '':
+                break
+            elif signal.lower() == 'n':
+                return
             else:
-                extracted_info['source'] = 'BLURAY.REMUX'
-            extracted_info['codec'] = media.get('Media')[0].get('videoCodec')
-            extracted_info['audio_format'] = media.get('Media')[0].get('audioCodec')
-            extracted_info['edit_version'] = None
-            return extracted_info
+                continue
 
-    return None
+        for file in video_rename_list + subtitle_rename_list:
+            os.rename(folder_path + file['original_name'], folder_path + file['target_name'])
+            if self.debug:
+                print("Renaming: {} -> {}".format(file['original_name'], file['target_name']))
+            time.sleep(1)
 
-def get_plex_info(filenames, plex_api):
-    plex_info_dict = {}
-    for filename in filenames:
-        title, *year = filename.rsplit(' ', 1)
-        year = year[0] if year else None
-        plex_info = search_movie(plex_api, title, year)
-        if plex_info:
-            plex_info_dict[filename] = plex_info
-    return plex_info_dict
+        print("File renaming operation completed")
 
-def collect_files_info(parent_folder_path):
-    files_info = {}
-    all_filenames = []
+    def tv_rename_keyword(self,
+                          keyword: str,
+                          folder_path: str,
+                          folder_password=None,
+                          first_number: int = 1) -> dict:
+        """
+        根据TMDB剧集关键词获取剧集标题,并批量将Alist指定文件夹中的视频文件及字幕文件重命名为剧集标题.
 
-    for root, dirs, files in os.walk(parent_folder_path):
-        for filename in files:
-            file_path = os.path.join(root, filename)
-            file_info = get_file_info(file_path)
-            if file_info:
-                files_info[file_path] = file_info
-                all_filenames.append(filename)
-    return files_info, all_filenames
+        :param keyword: 剧集关键词
+        :param folder_path: 文件夹路径, 结尾必须加'/', 如/abc/test/
+        :param folder_password: 文件夹访问密码
+        :param first_number: 从指定集数开始命名, 如first_name=5, 则从第5集开始按顺序重命名
+        :return: 重命名请求结果
+        """
 
-def process_files_info(files_info, plex_info, plex_api):
-    rename_dict = {}
-    for file_path, elements_from_file in files_info.items():
-        final_elements = elements_from_file.copy()
+        notice_msg = colorama.Fore.YELLOW + '[Notice!]' + colorama.Fore.RESET
 
-        if file_path in plex_info:
-            for key, value in plex_info[file_path].items():
-                if not final_elements.get(key):
-                    final_elements[key] = value
+        # 创建返回数据
+        result = dict(success=False,
+                      args=dict(keyword=keyword,
+                                folder_path=folder_path,
+                                first_number=first_number),
+                      result=[])
+        # 使用关键词查找剧集
+        search_result = self.tmdb.search_tv(keyword, language=self.tmdb_language)
+        result['result'].append(search_result)
+        # 查找失败则停止, 并返回结果
+        if search_result['request_code'] != 200 or len(
+                search_result['results']) == 0:
+            return result
 
-        new_filename = f"{final_elements['title']}.{final_elements['year']}.{final_elements['resolution']}.{final_elements['source']}.{final_elements['codec']}.{final_elements['bit_depth']}.{final_elements['hdr_info']}.{final_elements['audio_format']}.{final_elements['audio_standard']}.{final_elements['edit_version']}.{file_ext}"
-        rename_dict[file_path] = os.path.join(os.path.dirname(file_path), new_filename)
-    return rename_dict
+        # 若查找结果只有一项, 则继续进行, 无需选择
+        if len(search_result['results']) == 1:
+            rename_result = self.tv_rename_id(
+                search_result['results'][0]['id'], folder_path,
+                folder_password, first_number)
+            result['result'] += (rename_result['result'])
+            return result
 
-def rename_files(rename_dict):
-    for i, (old_name, new_name) in enumerate(rename_dict.items()):
-        choices = input("请输入你不想修改的文件序号，如果全部修改，请直接按回车：")
-        if choices:
-            choices = map(int, choices.split())
-            for choice in choices:
-                del rename_dict[list(rename_dict.keys())[choice]]
+        # 若有多项, 则手动选择
+        while True:
+            tv_number = input(f"{notice_msg} 查找到多个结果, 请输入对应[序号], 输入[n]退出\t")
+            active_number = list(range(len(search_result['results'])))
+            active_number = list(map(lambda x: str(x), active_number))
+            if tv_number == 'n':
+                result['result'].append("用户输入[n], 已主动退出选择匹配剧集")
+                return result
+            elif tv_number in active_number:
+                tv_id = search_result['results'][int(tv_number)]['id']
+                break
+            else:
+                continue
 
-        for old_name, new_name in rename_dict.items():
-            os.rename(old_name, new_name)
+        # 根据获取到的id进行重命名
+        for season_number in range(1, len(search_result['results']) + 1):
+            rename_result = self.tv_rename_id(search_result['results'][int(tv_number)]['id'], folder_path, first_number)
+            result['result'] += (rename_result['result'])
+        return result
 
-def main():
-    config_manager = ConfigManager(CONFIG_FILE)
-    server_info_and_key = config_manager.get_server_info_and_key()
-    plex_api = PlexApi(server_info_and_key['plex_url'], server_info_and_key['plex_token'])
-
-    parent_folder_path = input("请输入父文件夹的路径：")
-    files_info, all_filenames = collect_files_info(parent_folder_path)
-
-    plex_info = get_plex_info(all_filenames, plex_api)
-
-    rename_dict = process_files_info(files_info, plex_info, plex_api)
-
-    rename_files(rename_dict)
-
-if __name__ == "__main__":
-   main()
-```
+if __name__ == '__main__':
+    tmdb_key = 'e3c0a'
+    root_folder_path = r'C:\Users\china\Desktop\备份\国剧\A'
+    renamer = LocalMediaRename(tmdb_key)
+    for folder_name in os.listdir(root_folder_path):
+        folder_path = os.path.join(root_folder_path, folder_name)
+        if os.path.isdir(folder_path):
+            renamer.rename_files(folder_path)
