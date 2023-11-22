@@ -1,53 +1,24 @@
-# -*- coding: utf-8 -*-
-# @Time : 2023/11/03
-# @File : main.py
+import os
 
-from typing import Tuple, Union, List, Dict
-from media_renamer import MediaRenamer
-from config import ConfigManager
-from api import TMDBApi, PlexApi
+def run_script():
+    scripts = ['rename_folder.py', 'rename_movie.py', 'rename_show.py']
+    print("请选择你想要运行的脚本：")
+    print("1. rename_folder,重命名文件夹")
+    print("2. rename_movie, 重命名电影文件")
+    print("3. rename_show,  重命名剧集文件")
+    print("4. 脚本功能帮助")
 
-CONFIG_FILE = 'config.json'
-
-
-def main() -> None:
-    config_manager: ConfigManager = ConfigManager(CONFIG_FILE)
-    server_info_and_key: dict = config_manager.get_server_info_and_key()
-    tmdb_api: TMDBApi = TMDBApi(server_info_and_key['tmdb_api_key'])
-    plex_api: PlexApi = PlexApi(server_info_and_key['plex_url'], server_info_and_key['plex_token'], execute_request=False)
-    media_renamer: MediaRenamer = MediaRenamer(config_manager, tmdb_api, plex_api)
-    print('Starting program')
-
-    match_mode_index: int
-    library_type_index: int
-    naming_rule_index: int
-    parent_folder_path: str
-    match_mode_index, library_type_index, naming_rule_index, parent_folder_path = media_renamer.get_user_input()
-
-    if match_mode_index not in [1, 2, 3, 4]:
-        print("Invalid match mode. Please enter a number between 1 and 4.")
-        return
+    choice = input("请输入你想要运行的脚本的序号：")
+    if choice.isdigit() and 1 <= int(choice) <= len(scripts):
+        os.system(f"python {scripts[int(choice)-1]}")
+    elif choice == '4':
+        # 在这里添加你的帮助信息
+        print("这是一个简单的脚本选择器。你可以通过输入相应的序号来选择你想要运行的脚本。")
+        print("1. 重命名文件夹：这个脚本会重命名当前目录下的所有文件夹。")
+        print("2. 重命名电影文件：这个脚本会重命名当前目录下的所有电影文件。")
+        print("3. 重命名电视剧文件：这个脚本会重命名当前目录下的所有电视剧文件。")
     else:
-        print("Invalid match mode. Please enter a number between 1 and 4.")
-    if library_type_index not in [1, 2]:
-        print("Invalid library type. Please enter either 1 or 2.")
-        return
-
-    if naming_rule_index not in [1, 2, 3]:
-        print("Invalid naming rule. Please enter a number between 1 and 3.")
-        return
-
-    if match_mode_index == 4:
-        media_renamer.match_mode_4(parent_folder_path)
-        exit()
-
-    if match_mode_index == 1:
-        media_renamer.match_mode_1(parent_folder_path, library_type_index, naming_rule_index, config_manager)
-    elif match_mode_index == 2:
-        media_renamer.match_mode_2(parent_folder_path, library_type_index, naming_rule_index, config_manager)
-    elif match_mode_index == 3:
-        media_renamer.match_mode_3(parent_folder_path, naming_rule_index)
-
+        print("输入的序号无效。")
 
 if __name__ == "__main__":
-    main()
+    run_script()

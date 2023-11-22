@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# @Time : 2023/11/03
+# @Time : 2023/11/21
 # @File : config.py
 
 import os
@@ -82,3 +82,4 @@ class ConfigManager:
             'movies_folder': self.movies_folder,
             'shows_folder': self.shows_folder
         }
+    

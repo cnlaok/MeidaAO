@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# @Time : 2023/11/19
+# @Time : 2023/11/21
 # @File : rename_movie.py
 
 import os
@@ -16,12 +16,10 @@ CONFIG_FILE = 'config.json'
 def format_file_info(index: int, old_name: str, new_name: str) -> str:
     """
     格式化文件信息的输出。
-
     参数:
     index (int): 文件的索引。
     old_name (str): 文件的原始名称。
     new_name (str): 文件的新名称。
-
     返回:
     str: 格式化后的文件信息。
     """

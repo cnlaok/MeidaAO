@@ -1,15 +1,15 @@
 # -*- coding: utf-8 -*-
-# @Time : 2023/11/03
+# @Time : 2023/11/21
 # @File : api.py
 
 import json
 import requests
-from xml.etree import ElementTree
 from typing import  Union, List, Dict
 from tqdm import tqdm
 from config import ConfigManager
 import time
 
+# 定义PlexApi类
 class PlexApi:
     def __init__(self, plex_url: str, plex_token: str, execute_request: bool = True):
         self.plex_url = plex_url  
@@ -147,7 +147,6 @@ class TMDBApi:
     def tv_info(self, tv_id: str, language: str = 'zh-CN', silent: bool = False) -> dict:
         """
         根据提供的id获取剧集信息.
-
         :param tv_id: 剧集id
         :param language: TMDB搜索语言
         :param silent: 静默返回请求结果, 不输出内容
@@ -232,13 +231,11 @@ class TMDBApi:
 
             # 格式化并打印搜索结果
             print(f"{success_msg} 关键词[{keyword}]查找结果如下: ")
-            print("{:<8}{:^14}{:^6}{}".format(" 首播时间 ", "序号", "TMDB ID", "剧 名"))
-            print("{:<12}{:^16}{:^8}{}".format("----------", "-----", "-------", "----------------"))
+            print("{:<11}{:<8}{:<10}{}".format("首播时间", "序号", "TMDB-ID", "剧 名"))
+            print("{:<15}{:<10}{:<10}{}".format("----------", "-----", "-------", "----------------"))
 
             for i, result in enumerate(return_data['results']):
-                print("{:<12}{:^16}{:^8}{}".format(result['first_air_date'], i, result['id'], result['name']))
-
-
+                print("{:<15}{:<10}{:<10}{}".format(result['first_air_date'], i, result['id'], result['name']))
 
             # 返回搜索结果
             return return_data
@@ -264,11 +261,9 @@ class TMDBApi:
 
         # 发送GET请求并获取响应
         r = requests.get(post_url, params=post_params)
-
         # 将响应转换为JSON格式，并添加状态码到返回数据中
         return_data = r.json()
         return_data['request_code'] = r.status_code
-
         # 如果silent为True，则直接返回数据，否则打印请求结果
         if silent:
             return return_data
@@ -281,7 +276,7 @@ class TMDBApi:
         if r.status_code != 200:
             print(f"{failure_msg} 剧集id: {tv_id}\t第 {season_number} 季\n{return_data['status_message']}")
             return return_data
-
+        
     # 根据提供的id获取电影信息
     def movie_info(self, movie_id: str, language: str = 'zh-CN', silent: bool = False) -> dict:
         """
@@ -371,11 +366,12 @@ class TMDBApi:
 
         # 格式化并打印搜索结果
         print(f"{success_msg} 关键词[{keyword}]查找结果如下: ")
-        print("{:<8}{:^14}{:^6}{}".format(" 首播时间 ", "序号", "ID", "电影标题"))
-        print("{:<12}{:^16}{:^8}{}".format("----------", "-----", "-------", "----------------"))
+        print("{:<11}{:<8}{:<10}{}".format("首播时间", "序号", "TMDB-ID", "电影标题"))
+        print("{:<15}{:<10}{:<10}{}".format("----------", "-----", "-------", "----------------"))
 
         for i, result in enumerate(return_data['results']):
-            print("{:<12}{:^16}{:^8}{}".format(result['release_date'], i, result['id'], result['title']))
+            print("{:<15}{:<10}{:<10}{}".format(result['release_date'], str(i), str(result['id']), result['title']))
+
 
         # 返回搜索结果
         return return_data
