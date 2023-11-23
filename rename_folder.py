@@ -10,9 +10,10 @@ from typing import Tuple, Union, List, Dict
 from config import ConfigManager
 from colorama import Fore, Style
 from api import PlexApi, TMDBApi
-
+print(dir(TMDBApi))
 # 定义配置文件的路径
 CONFIG_FILE = 'config.json'
+
 
 # 定义MediaRenamer类，用于重命名媒体文件
 class MediaRenamer:
@@ -34,7 +35,7 @@ class MediaRenamer:
             if year:
                 year = year.group()
         folder_without_year = re.sub(str(year), '', folder_name) if year else folder_name
-        chinese_titles = re.findall(r'[\u4e00-\u9fff0-9：，]+', folder_without_year)
+        chinese_titles = re.findall(r'[\u4e00-\u9fff0-9：，·]+', folder_without_year)
         english_title = ' '.join(re.findall(r'[a-zA-Z\s]+(?![^\(]*\))', folder_without_year))
         if not chinese_titles and not english_title:
             title = ''.join(re.findall(r'(?<!\()\d+(?!\))', folder_without_year))
@@ -54,7 +55,6 @@ class MediaRenamer:
 
     # 处理文件夹
     def process_folder(self, folder_path: str, new_folder_name: str, match_data: dict):
-        print(f"正在处理文件夹：{folder_path}")
         folder_name = os.path.basename(folder_path)
         parent_folder_path = os.path.dirname(folder_path)
         new_folder_path = os.path.join(parent_folder_path, new_folder_name)
@@ -130,7 +130,7 @@ class MediaRenamer:
                     if not os.path.exists(target_path):
                         try:
                             os.rename(new_folder_path, target_path)
-                            print(f"文件夹已成功移动到：{target_path}")
+                            print(f"文件夹已移动到：{target_path}")
                         except OSError as e:
                             print(f"移动文件夹时出错: {e}")
 
@@ -146,7 +146,7 @@ class MediaRenamer:
                 continue
 
             title, year = self.extract_folder_info(folder_name)
-
+            print("TMDBApi methods:", dir(self.tmdb_api))
             matched_content = None
             if library_type_index == 1:
                 print(f"正在搜索电影中：{title} ({year})")

@@ -2,13 +2,14 @@
 # @Time : 2023/11/22
 # @File : rename_show.py
 
-
+import re
 import os
 import time
 import json
-from api import TMDBApi
 import colorama
-import re
+from api import TMDBApi
+
+
 class LocalMediaRename:
     def __init__(self, tmdb_key: str, debug: bool = True):
         self.tmdb = TMDBApi(tmdb_key)
