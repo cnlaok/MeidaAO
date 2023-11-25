@@ -4,7 +4,7 @@
 
 import json
 import requests
-from typing import  Union, List, Dict
+from typing import Union, List, Dict
 from tqdm import tqdm
 from config import ConfigManager
 import time
@@ -22,13 +22,12 @@ class PlexApi:
         if execute_request:  # 如果execute_request为True，则尝试连接到Plex服务器
             response = requests.get(self.plex_url, headers=self.headers)
             if response.status_code == 200:
-                print("Successfully connected to the Plex server.")
+                print("成功连接PLEX服务器.")
             else:
-                print("Failed to connect to the Plex server.")
+                print("连接PLEX服务器失败.")
         self.class_name = type(self).__name__  # 获取当前类的名称
-        print(f"{self.class_name} initialised")  # 打印类名和初始化状态
 
-    def send_request(self, search_url):
+    def send_request(self, search_url: str) -> Union[requests.Response, None]:
         max_attempts = 3
         for attempt in range(max_attempts):
             try:
@@ -50,9 +49,8 @@ class PlexApi:
 
         return response
 
-
     # 搜索节目的方法
-    def search_show(self, title: str, year: Union[str, None] = None) -> Union[Dict[str, str], None]:
+    def search_tv(self, title: str, year: Union[str, None] = None) -> Union[Dict[str, str], None]:
         search_endpoint = f"/search?query={title}"
         search_url = self.plex_url + search_endpoint
         response = self.send_request(search_url)
@@ -61,16 +59,16 @@ class PlexApi:
             for show in shows['MediaContainer']['Metadata']:
                 if year:
                     if show.get('title') == title and show.get('year') == int(year):
-                        show_details = self.get_show_details(show)
+                        show_details = self.tv_info(show)
                         return show_details
                 elif show.get('title') == title:
-                    show_details = self.get_show_details(show)
+                    show_details = self.tv_info(show)
                     return show_details
         print("\033[91m未发现媒体\033[0m")
         return None
 
     # 获取节目详情的方法
-    def get_show_details(self, show: str,  silent: bool = False) -> dict:
+    def tv_info(self, show: str,  silent: bool = False) -> dict:
         plex_endpoint = "/library/metadata/" + show['ratingKey']  # 构造端点
         search_url = self.plex_url + plex_endpoint  # 构造URL
         response = self.send_request(search_url)  # 发送GET请求
@@ -95,16 +93,16 @@ class PlexApi:
             for movie in movies['MediaContainer']['Metadata']:  # 遍历'Metadata'
                 if year:  # 如果提供了年份
                     if movie.get('title') == title and movie.get('year') == int(year):  # 如果标题和年份匹配
-                        details = self.get_movie_details(movie)  # 获取电影详情
+                        details = self.movie_info(movie)  # 获取电影详情
                         return details  # 返回电影详情
                 elif movie.get('title') == title:  # 如果只提供了标题
-                    movie_details = self.get_movie_details(movie)  # 获取电影详情
+                    movie_details = self.movie_info(movie)  # 获取电影详情
                     return movie_details  # 返回电影详情
         print("\033[91m未发现媒体\033[0m")  # 如果没有找到匹配的电影，打印消息
         return None  # 返回None
 
     # 获取电影详情的方法
-    def get_movie_details(self, movie: str) -> dict:
+    def movie_info(self, movie: str) -> dict:
         plex_endpoint = movie['key']  # 构造端点
         search_url = self.plex_url + plex_endpoint  # 构造URL
         response = self.send_request(search_url)  # 发送GET请求
@@ -140,25 +138,80 @@ class TMDBApi:
         self.api_url = "https://api.themoviedb.org/3"  # TMDB API的URL
 
     # 发送请求并处理重试
-    def send_request(self, url, params):
-        max_retries = 3  # 设置最大重试次数
-        retry_delay = 3  # 设置每次重试之间的延迟（以秒为单位）
-
-        for i in range(max_retries):
+    def send_request(self, url: str, params: Dict[str, str]) -> Union[requests.Response, None]:
+        max_attempts = 3
+        for attempt in range(max_attempts):
             try:
-                r = requests.get(url, params=params)  # 发送GET请求
-                # 如果请求成功，则跳出循环
-                break
+                response = requests.get(url, params=params)
+                # 如果状态码不是200，将引发一个异常
+                response.raise_for_status()
             except requests.exceptions.RequestException as e:
-                print(f"请求失败: {e}")
-                # 如果达到最大重试次数，则抛出异常
-                if i == max_retries - 1:
-                    raise
-                # 否则，等待一段时间后再次尝试
-                print(f"等待 {retry_delay} 秒后重试...")
-                time.sleep(retry_delay)
+                print(f"请求失败，错误信息：{e}")
+                if attempt < max_attempts - 1:  # 如果不是最后一次尝试，等待一段时间再重试
+                    wait_time = 2 ** attempt  # 指数退避策略
+                    print(f"等待{wait_time}秒后重试...")
+                    time.sleep(wait_time)
+                    continue
+            else:
+                break  # 如果请求成功，跳出循环
+        else:
+            print("所有尝试都失败，跳过请求。")
+            return None
 
-        return r.json()  # 返回JSON格式的响应
+        return response
+
+    # 根据关键字匹配剧集, 获取相关信息
+    def search_tv(self, title: str, year: str = None, language: str = 'zh-CN', silent: bool = False) -> dict:
+        # 构造请求URL和参数
+        post_url = "{0}/search/tv".format(self.api_url)  # 构造请求URL
+        post_params = dict(api_key=self.key, query=title, language=language)  # 构造请求参数
+
+        # 使用send_request方法发送GET请求并获取响应
+        response = self.send_request(post_url, post_params)
+
+        if response is None:
+            print("所有尝试都失败，跳过请求。")
+            return None
+
+        # 将响应转换为JSON格式，并添加状态码到返回数据中
+        return_data = response.json()  # 获取JSON格式的响应
+        return_data['request_code'] = response.status_code  # 添加状态码到返回数据中
+
+        # 如果silent为True，则直接返回数据，否则打印请求结果
+        if silent:
+            return return_data
+
+        # 设置成功和失败消息的颜色
+        failure_msg = '\033[31m' + '\n[TvSearch●Failure]' + '\033[0m'
+        success_msg = '\033[32m' + '\n[TvSearch●Success]' + '\033[0m'
+
+        # 如果请求失败，则打印失败消息并返回数据
+        if response.status_code != 200:
+            print(f"{failure_msg} title: {title}\n{return_data['status_message']}")
+            return return_data
+
+        # 如果没有搜索结果，则打印失败消息并返回数据
+        if len(return_data['results']) == 0:
+            print(f"{failure_msg} 关键词[{title}]查找不到任何相关剧集")
+            return return_data
+
+        # 格式化并打印搜索结果
+        print(f"{success_msg} 关键词[{title}]查找结果如下: ")
+        print("{:<11}{:<8}{:<10}{}".format("首播时间", "序号", "TMDB-ID", "剧 名"))
+        print("{:<15}{:<10}{:<10}{}".format("----------", "-----", "-------", "----------------"))
+
+        # 在返回结果中查找匹配的电视剧
+        for i, result in enumerate(return_data['results']):
+            print("{:<15}{:<10}{:<10}{}".format(result['first_air_date'], i, result['id'], result['name']))
+            # 如果提供了年份，检查年份是否匹配
+            if year and result['first_air_date'][:4] != year:
+                continue
+            # 如果标题匹配（并且如果提供了年份，年份也匹配），则返回结果
+            return return_data
+
+        # 如果没有找到匹配的结果，返回None
+        return None
+
 
     # 根据提供的id获取剧集信息
     def tv_info(self, tv_id: str, language: str = 'zh-CN', silent: bool = False) -> dict:
@@ -173,12 +226,16 @@ class TMDBApi:
         post_url = "{0}/tv/{1}".format(self.api_url, tv_id)  # 构造请求URL
         post_params = dict(api_key=self.key, language=language)  # 构造请求参数
 
-        # 发送GET请求并获取响应
-        r = requests.get(post_url, params=post_params)  # 发送GET请求
+        # 使用send_request方法发送GET请求并获取响应
+        response = self.send_request(post_url, post_params)
+
+        if response is None:
+            print("所有尝试都失败，跳过请求。")
+            return None
 
         # 将响应转换为JSON格式，并添加状态码到返回数据中
-        return_data = r.json()  # 获取JSON格式的响应
-        return_data['request_code'] = r.status_code  # 添加状态码到返回数据中
+        return_data = response.json()  # 获取JSON格式的响应
+        return_data['request_code'] = response.status_code  # 添加状态码到返回数据中
 
         # 如果silent为True，则直接返回数据，否则打印请求结果
         if silent:
@@ -189,7 +246,7 @@ class TMDBApi:
         success_msg = '\033[32m' + '\n[TvInfo●Success]' + '\033[0m'
 
         # 如果请求失败，则打印失败消息并返回数据
-        if r.status_code != 200:
+        if response.status_code != 200:
             print(f"{failure_msg} tv_id: {tv_id}\n{return_data['status_message']}")
             return return_data
 
@@ -202,67 +259,13 @@ class TMDBApi:
         # 返回请求结果
         return return_data
 
-    # 根据关键字匹配剧集, 获取相关信息
-    def search_tv(self, keyword: str, language: str = 'zh-CN', silent: bool = False) -> dict:
-            """
-            根据关键字匹配剧集, 获取相关信息.
-
-            :param keyword: 剧集搜索关键词
-            :param language:
-            :param silent: 静默返回请求结果,不输出内容
-            :return: 匹配剧集信息请求结果
-            """
-            # 构造请求URL和参数
-            post_url = "{0}/search/tv".format(self.api_url)  # 构造请求URL
-            post_params = dict(api_key=self.key, query=keyword, language=language)  # 构造请求参数
-
-            # 发送GET请求并获取响应
-            try:
-                # 发送GET请求并获取响应
-                r = requests.get(post_url, params=post_params)
-                # 将响应转换为JSON格式，并添加状态码到返回数据中
-                return_data = r.json()
-                return_data['request_code'] = r.status_code
-            except requests.exceptions.RequestException as e:
-                # 如果出错，打印错误信息并跳过
-                print(f"请求出错，错误信息：{e}")
-                return None
-
-            # 如果silent为True，则直接返回数据，否则打印请求结果
-            if silent:
-                return return_data
-
-            # 设置成功和失败消息的颜色
-            failure_msg = '\033[31m' + '\n[TvSearch●Failure]' + '\033[0m'
-            success_msg = '\033[32m' + '\n[TvSearch●Success]' + '\033[0m'
-
-            # 如果请求失败，则打印失败消息并返回数据
-            if r.status_code != 200:
-                print(f"{failure_msg} Keyword: {keyword}\n{return_data['status_message']}")
-                return return_data
-
-            # 如果没有搜索结果，则打印失败消息并返回数据
-            if len(return_data['results']) == 0:
-                print(f"{failure_msg} 关键词[{keyword}]查找不到任何相关剧集")
-                return return_data
-
-            # 格式化并打印搜索结果
-            print(f"{success_msg} 关键词[{keyword}]查找结果如下: ")
-            print("{:<11}{:<8}{:<10}{}".format("首播时间", "序号", "TMDB-ID", "剧 名"))
-            print("{:<15}{:<10}{:<10}{}".format("----------", "-----", "-------", "----------------"))
-
-            for i, result in enumerate(return_data['results']):
-                print("{:<15}{:<10}{:<10}{}".format(result['first_air_date'], i, result['id'], result['name']))
-
-            # 返回搜索结果
-            return return_data
 
     # 获取指定季度剧集信息
     def tv_season_info(self,
-                       tv_id: str,
-                       season_number: int,
-                       language: str = 'zh-CN',
-                       silent: bool = False) -> dict:
+                    tv_id: str,
+                    season_number: int,
+                    language: str = 'zh-CN',
+                    silent: bool = False) -> dict:
         """
         获取指定季度剧集信息.
         :param tv_id: 剧集id
@@ -273,14 +276,20 @@ class TMDBApi:
         """
         # 构造请求URL和参数
         post_url = "{0}/tv/{1}/season/{2}".format(self.api_url, tv_id,
-                                                  season_number)  # 构造请求URL
+                                                season_number)  # 构造请求URL
         post_params = dict(api_key=self.key, language=language)  # 构造请求参数
 
-        # 发送GET请求并获取响应
-        r = requests.get(post_url, params=post_params)  # 发送GET请求
+        # 使用send_request方法发送GET请求并获取响应
+        response = self.send_request(post_url, post_params)
+
+        if response is None:
+            print("所有尝试都失败，跳过请求。")
+            return None
+
         # 将响应转换为JSON格式，并添加状态码到返回数据中
-        return_data = r.json()  # 获取JSON格式的响应
-        return_data['request_code'] = r.status_code  # 添加状态码到返回数据中
+        return_data = response.json()  # 获取JSON格式的响应
+        return_data['request_code'] = response.status_code  # 添加状态码到返回数据中
+
         # 如果silent为True，则直接返回数据，否则打印请求结果
         if silent:
             return return_data
@@ -290,9 +299,13 @@ class TMDBApi:
         success_msg = '\033[32m' + '\n[TvSeason●Success]' + '\033[0m'
 
         # 如果请求失败，则打印失败消息并返回数据
-        if r.status_code != 200:
+        if response.status_code != 200:
             print(f"{failure_msg} 剧集id: {tv_id}\t第 {season_number} 季\n{return_data['status_message']}")
             return return_data
+
+        # 返回请求结果
+        return return_data
+
         
     # 根据提供的id获取电影信息
     def movie_info(self, movie_id: str, language: str = 'zh-CN', silent: bool = False) -> dict:
@@ -307,12 +320,16 @@ class TMDBApi:
         post_url = "{0}/movie/{1}".format(self.api_url, movie_id)  # 构造请求URL
         post_params = dict(api_key=self.key, language=language)  # 构造请求参数
 
-        # 发送GET请求并获取响应
-        r = requests.get(post_url, params=post_params)  # 发送GET请求
+        # 使用send_request方法发送GET请求并获取响应
+        response = self.send_request(post_url, post_params)
+
+        if response is None:
+            print("所有尝试都失败，跳过请求。")
+            return None
 
         # 将响应转换为JSON格式，并添加状态码到返回数据中
-        return_data = r.json()  # 获取JSON格式的响应
-        return_data['request_code'] = r.status_code  # 添加状态码到返回数据中
+        return_data = response.json()  # 获取JSON格式的响应
+        return_data['request_code'] = response.status_code  # 添加状态码到返回数据中
 
         # 如果silent为True，则直接返回数据，否则打印请求结果
         if silent:
@@ -323,9 +340,10 @@ class TMDBApi:
         success_msg = '\033[32m' + '\n[MovieInfo●Success]' + '\033[0m'
 
         # 如果请求失败，则打印失败消息并返回数据
-        if r.status_code != 200:
+        if response.status_code != 200:
             print(f"{failure_msg} movie_id: {movie_id}\n{return_data['status_message']}")
             return return_data
+
         # 格式化并打印请求结果
         release_year = return_data['release_date'][:4]
         name = return_data['title']
@@ -337,21 +355,21 @@ class TMDBApi:
 
 
     # 根据关键字匹配电影, 获取相关信息
-    def search_movie(self, keyword: str, language: str = 'zh-CN', silent: bool = False) -> dict:
+    def search_movie(self, title: str, year: str = None, language: str = 'zh-CN', silent: bool = False) -> dict:
+        # 构造请求URL和参数
         post_url = "{0}/search/movie".format(self.api_url)  # 构造请求URL
-        post_params = dict(api_key=self.key, query=keyword, language=language)  # 构造请求参数
-        # 打印请求的 URL 和参数，以便调试
-        print(f"请求URL: {post_url}")
-        print(f"请求参数: {post_params}")
+        post_params = dict(api_key=self.key, query=title, language=language)  # 构造请求参数
 
-        # 发送GET请求并获取响应
-        try:
-            r = requests.get(post_url, params=post_params)
-            return_data = r.json()
-            return_data['request_code'] = r.status_code
-        except requests.exceptions.RequestException as e:
-            print(f"请求出错，错误信息：{e}")
+        # 使用send_request方法发送GET请求并获取响应
+        response = self.send_request(post_url, post_params)
+
+        if response is None:
+            print("所有尝试都失败，跳过请求。")
             return None
+
+        # 将响应转换为JSON格式，并添加状态码到返回数据中
+        return_data = response.json()  # 获取JSON格式的响应
+        return_data['request_code'] = response.status_code  # 添加状态码到返回数据中
 
         if silent:
             return return_data
@@ -360,17 +378,27 @@ class TMDBApi:
         failure_msg = '\033[31m' + '\n[MovieSearch●Failure]' + '\033[0m'
         success_msg = '\033[32m' + '\n[MovieSearch●Success]' + '\033[0m'
 
-        if r.status_code != 200:
-            print(f"{failure_msg} Keyword: {keyword}\n{return_data['status_message']}")
+        if response.status_code != 200:
+            print(f"{failure_msg} title: {title}\n{return_data['status_message']}")
             return return_data
 
         if len(return_data['results']) == 0:
-            print(f"{failure_msg} 关键词[{keyword}]查找不到任何相关电影")
+            print(f"{failure_msg} 关键词[{title}]查找不到任何相关电影")
             return return_data
 
-        print(f"{success_msg} 关键词[{keyword}]查找结果如下: ")
+        print(f"{success_msg} 关键词[{title}]查找结果如下: ")
         print("{:<11}{:<8}{:<10}{}".format("首播时间", "序号", "TMDB-ID", "电影标题"))
+        
+        # 在返回结果中查找匹配的电影
         for i, result in enumerate(return_data['results']):
             print("{:<15}{:<10}{:<10}{}".format(result['release_date'], str(i + 1), str(result['id']), result['title']))
+            # 如果提供了年份，检查年份是否匹配
+            if year and result['release_date'][:4] != year:
+                continue
+            # 如果年份匹配，则返回结果
+            return return_data
 
-        return return_data
+        # 如果没有找到匹配的结果，返回None
+        return None
+
+

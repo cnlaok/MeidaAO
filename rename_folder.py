@@ -5,12 +5,11 @@
 # 导入所需的类型和模块
 import os
 import re
-import requests
 from typing import Tuple, Union, List, Dict
 from config import ConfigManager
 from colorama import Fore, Style
 from api import PlexApi, TMDBApi
-print(dir(TMDBApi))
+
 # 定义配置文件的路径
 CONFIG_FILE = 'config.json'
 
@@ -117,7 +116,7 @@ class MediaRenamer:
                 matched_content = self.plex_api.search_movie(title)
             elif library_type_index == 2:
                 print(f"正在搜索剧集中：{title} ({year})")
-                matched_content = self.plex_api.search_show(title, year)
+                matched_content = self.plex_api.search_tv(title, year)
 
             if matched_content:
                 print(f"从库中获取内容: {matched_content['title']} ({matched_content['year']}) {{tmdbid-{matched_content['tmdbid']}}}")
@@ -146,11 +145,11 @@ class MediaRenamer:
                 continue
 
             title, year = self.extract_folder_info(folder_name)
-            print("TMDBApi methods:", dir(self.tmdb_api))
+
             matched_content = None
             if library_type_index == 1:
                 print(f"正在搜索电影中：{title} ({year})")
-                matched_content = self.tmdb_api.search_movie(title)
+                matched_content = self.tmdb_api.search_movie(title, year)
                 # 如果搜索结果为空，提示用户手动输入
                 if matched_content is None:
                     title = input("未找到匹配的电影。请手动输入标题（留空表示跳过）：")
@@ -160,7 +159,7 @@ class MediaRenamer:
                         matched_content = self.tmdb_api.search_movie(title)
             elif library_type_index == 2:
                 print(f"正在搜索剧集中：{title} ({year})")
-                matched_content = self.tmdb_api.search_tv(title)
+                matched_content = self.tmdb_api.search_tv(title, year)
                 # 如果搜索结果为空，提示用户手动输入
                 if matched_content is None:
                     title = input("未找到匹配的剧集。请手动输入标题（留空表示跳过）：")
@@ -224,7 +223,7 @@ class MediaRenamer:
             elif library_type_index == 2:
                 print(f"正在搜索剧集中：{title} ({year})")
                 # 使用Plex API搜索剧集
-                matched_content = self.plex_api.search_show(title, year)
+                matched_content = self.plex_api.search_tv(title, year)
                 # 如果找到了匹配的剧集
                 if matched_content:
                     print(f"从库中获取剧集: {matched_content['title']} ({matched_content['year']}) {{tmdbid-{matched_content['tmdbid']}}}")
