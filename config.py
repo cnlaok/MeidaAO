@@ -28,9 +28,10 @@ class ConfigManager:
     def load_config(self) -> None:
         # 检查配置文件是否存在，如果存在则加载
         if os.path.exists(self.config_file):
-            with open(self.config_file, 'r') as f:
+            with open(self.config_file, 'r', encoding='utf-8') as f:
                 self.config = json.load(f)
         self.check_config()
+
 
     def check_config(self) -> None:
         # 配置文件中需要的键
@@ -83,8 +84,9 @@ class ConfigManager:
 
     def save_config(self) -> None:
         # 保存配置到文件
-        with open(self.config_file, 'w') as f:
-            json.dump(self.config, f)
+        with open(self.config_file, 'w', encoding='utf-8') as f:
+            json.dump(self.config, f, ensure_ascii=False, indent=4)
+
 
     def get_server_info_and_key(self) -> Dict[str, str]:
         # 获取服务器信息和密钥
