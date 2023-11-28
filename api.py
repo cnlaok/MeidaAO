@@ -38,7 +38,7 @@ class PlexApi:
                 response = requests.get(search_url, headers=self.headers)
                 response.raise_for_status()
             except requests.exceptions.RequestException as e:
-                print(Fore.RED + f"请求失败，错误信息：{e}" + Style.RESET_ALL)
+                print(Fore.RED + f"请求失败，错误信息：总共会重复请求3次，3次后跳过。" + Style.RESET_ALL)
                 if attempt < max_attempts - 1:
                     wait_time = 2 ** attempt
                     print(f"等待{wait_time}秒后重试...")
@@ -186,7 +186,7 @@ class TMDBApi:
                 response = requests.get(url, params=params)
                 response.raise_for_status()
             except requests.exceptions.RequestException as e:
-                print(Fore.RED + f"请求失败，错误信息：{e}" + Style.RESET_ALL)
+                print(Fore.RED + f"请求失败，错误信息：总共会重复请求3次，3次后跳过。" + Style.RESET_ALL)
                 if attempt < max_attempts - 1:
                     wait_time = 2 ** attempt
                     print(f"等待{wait_time}秒后重试...")
@@ -371,8 +371,9 @@ class TMDBApi:
         if len(return_data['results']) == 0:
             print(f"{failure_msg} 关键词[{title}]查找不到任何相关电影")
             return return_data
-
-        filtered_results = [result for result in return_data['results'] if result['release_date'][:4] == year]
+        
+        filtered_results = [result for result in return_data['results'] if result.get('release_date', '')[:4] == year]
+        
         if len(filtered_results) == 0:
             print(f"{failure_msg} 关键词[{title}]查找不到任何相关电影")
             return return_data

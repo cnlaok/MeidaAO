@@ -31,6 +31,7 @@ class MediaRenamer:
             self.target_folder = self.move_folder(self.library_type_index, self.config_manager)
             # 在这里添加移动文件的代码
         else:
+            self.target_folder = self.parent_folder_path
             print("选择不移动文件。")
             # 在这里添加不移动文件的代码
 
@@ -121,6 +122,25 @@ class MediaRenamer:
                         print(Fore.RED + f"重命名文件夹时出错: {e}" + Style.RESET_ALL)
         else:
             print("文件夹无需修改")
+
+    def clean_folder_name(self, folder_name: str) -> str:
+        # 定义一个映射表将特殊字符替换为合法字符
+        char_map = {
+            '<': '＜',
+            '>': '＞',
+            ':': '：',
+            '"': '＂',
+            '/': '／',
+            '\\': '＼',
+            '|': '｜',
+            '?': '？',
+            '*': '＊'
+        }
+        for char, replacement in char_map.items():
+            folder_name = folder_name.replace(char, replacement)
+        return folder_name
+
+
 
     # 根据库的类型确定目标文件夹
     def move_folder(self, library_type_index: int, config_manager: ConfigManager):
@@ -244,6 +264,7 @@ class MediaRenamer:
 
                 print(Fore.BLUE + "从库中获取内容: " + Style.RESET_ALL + f"{title} ({year}) {{tmdbid-{tmdb_id}}}")
                 new_folder_name = self.folder_title_format(title, year, tmdb_id)
+                new_folder_name = self.clean_folder_name(new_folder_name)
                 new_folder_path = os.path.join(self.parent_folder_path, new_folder_name)  # 新添加的代码行
 
                 target_path = os.path.join(self.target_folder, new_folder_name)
@@ -254,14 +275,14 @@ class MediaRenamer:
                         if not os.path.exists(destination):
                             shutil.move(source, destination)
                         else:
-                            print(f"文件 {filename} 已存在，跳过移动。")
+                            print(f"跳过移动。")
                 else:
                     os.rename(folder_path, target_path)
 
                 # 检查源文件夹是否存在，如果存在，再检查是否为空
                 if os.path.exists(folder_path) and not os.listdir(folder_path):
                     os.rmdir(folder_path)
-                print(Fore.GREEN + "文件夹的所有内容已成功移动到：" + Style.RESET_ALL + f"{target_path}")
+                print(Fore.GREEN + "所有内容移动到：" + Style.RESET_ALL + f"{target_path}")
                 print(Fore.BLUE + "-" * 120)
 
     # 匹配模式3

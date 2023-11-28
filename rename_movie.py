@@ -10,9 +10,7 @@ import shutil
 from api import PlexApi
 from config import ConfigManager
 from colorama import Fore, Style
-from typing import Dict, Tuple, List
-
-
+from typing import Dict, Optional, Union, List, Tuple
 
 CONFIG_FILE = 'config.json'
 
@@ -22,62 +20,232 @@ class MovieRenamer:
         self.config_manager = ConfigManager(self.config_file)
         server_info_and_key = self.config_manager.get_server_info_and_key()
         self.plex_api = PlexApi(server_info_and_key['plex_url'], server_info_and_key['plex_token'])
-        self.video_suffix_list = ['.mp4', '.mkv', '.flv', '.avi', '.mpg', '.mpeg', '.mov', '.ts', '.wmv', '.rm', '.rmvb', '.3gp', '.3g2', '.webm']
-        self.subtitle_suffix_list = ['.srt', '.ass', '.stl', '.sub', '.smi', '.sami', '.ssa', '.vtt']
-        self.other_suffix_list = ['.nfo', '.jpg', '.txt', '.png', '.log']
-        self.movie_title_format = ['chinese_title', 'english_title', 'year', 'resolution', 'source', 'codec', 'audio_format', 'edit_version']
+        self.video_suffix_list = ['mp4', 'mkv', 'flv', 'avi', 'mpg', 'mpeg', 'mov', 'ts', 'wmv', 'rm', 'rmvb', '3gp', '3g2', 'webm']
+        self.subtitle_suffix_list = ['srt', 'ass', 'stl', 'sub', 'smi', 'sami', 'ssa', 'vtt']
+        self.other_suffix_list = ['nfo', 'jpg', 'txt', 'png', 'log']
+        self.movie_title_format = ['chinese_title', 'english_title', 'year', 'resolution', 'source', 'codec', 'bit_depth', 'hdr_info', 'audio_format', 'edit_version']
+        self.move_files = False
+        self.delete_other_files = False
 
-    def format_file_info(self, index: int, old_name: str, new_name: str) -> str:
+
+    def main(self) -> None:
         """
-        格式化文件信息的输出。
+        主函数。
+        """
+        parent_folder_path = input("请输入父文件夹的路径：")
+        if not os.path.exists(parent_folder_path):
+            print(Fore.RED + "输入的路径不存在，请检查后重新输入。" + Fore.RESET)
+            return
+        print(Fore.GREEN + f"预处理所有文件名: {parent_folder_path}" + Style.RESET_ALL)
+        # 在处理文件信息之前，先预处理文件
+        if self.move_files or self.delete_other_files:
+            self.move_and_delete_files(parent_folder_path)
+
+        rename_dict = self.process_movie_files(parent_folder_path)
+        if rename_dict is not None:
+            self.rename_files(rename_dict, self.movie_title_format)
+            print(Fore.RED + "重命名执行完毕" + Style.RESET_ALL)
+
+        subtitle_rename_dict = self.process_subtitle_files(parent_folder_path, rename_dict)
+        if subtitle_rename_dict is not None:
+            self.rename_files(subtitle_rename_dict, self.movie_title_format)
+            print(Fore.RED + "字幕文件重命名执行完毕" + Style.RESET_ALL)
+
+    def move_and_delete_files(self, parent_folder_path):
+        for root, dirs, files in os.walk(parent_folder_path, topdown=False):
+            # 跳过父文件夹和直接子目录
+            if root == parent_folder_path or os.path.dirname(root) == parent_folder_path:
+                continue
+
+            for filename in files:
+                file_path = os.path.join(root, filename)
+                extension = os.path.splitext(filename)[1][1:]
+
+                # 检查文件是否已经移动，如果已移动则跳过
+                if not os.path.exists(file_path):
+                    continue
+
+                # 移动文件
+                if self.move_files:
+                    movie_folder_path = os.path.dirname(root)
+                    target_path = os.path.join(movie_folder_path, filename)
+                    if not os.path.exists(target_path):
+                        shutil.move(file_path, target_path)
+
+                # 删除指定扩展名的文件
+                if self.delete_other_files and extension in self.other_suffix_list:
+                    os.remove(file_path)
+
+            # 检查并删除空目录
+            if not os.listdir(root):
+                os.rmdir(root)
+        print(Fore.RED + "执行移动删除完成。" + Style.RESET_ALL)
+
+    def process_movie_files(self, directory_path: str) -> Dict[str, str]:
+        """
+        遍历指定目录，处理所有媒体文件。
+
         参数:
-        index (int): 文件的索引。
-        old_name (str): 文件的原始名称。
-        new_name (str): 文件的新名称。
+        directory_path (str): 要处理的目录路径。
+
         返回:
-        str: 格式化后的文件信息。
+        Dict[str, str]: 媒体文件路径到新文件名的映射。
         """
-        old_name = os.path.basename(old_name)
-        new_name = os.path.basename(new_name)
-        return f"{index}. 改前名: {Fore.BLUE}{old_name}{Style.RESET_ALL}\n{index}. 改后名: {Fore.GREEN}{new_name}{Style.RESET_ALL}"
+        files_info, all_filenames = self.collect_files_info(directory_path)
+        rename_dict = {}
+        for file_path, elements_from_file in files_info.items():
+            final_elements = self.process_file_info(file_path, files_info, self.plex_api)
+            if final_elements:
+                new_name_elements = [str(final_elements[key]) for key in self.movie_title_format if final_elements[key] is not None]
+                new_filename = '.'.join(new_name_elements) + os.path.splitext(file_path)[1]
+                rename_dict[file_path] = os.path.join(os.path.dirname(file_path), new_filename)
+        return rename_dict or {}
 
-
-    def rename_files(self, rename_dict: Dict[str, str], template: list):
+    def process_subtitle_files(self, directory_path: str, media_files: Dict[str, str]) -> Dict[str, str]:
         """
-        重命名文件。
+        遍历指定目录，处理所有字幕文件。
 
         参数:
-        rename_dict (Dict[str, str]): 一个字典，包含旧文件名作为键，新文件名作为值。
-        template (list): 一个列表，包含文件名的组成部分。
+        directory_path (str): 要处理的目录路径。
+        media_files (Dict[str, str]): 媒体文件路径到新文件名的映射。
 
         返回:
-        无
+        Dict[str, str]: 字幕文件路径到新文件名的映射。
         """
-        index = 1
-        for old_name, new_name in rename_dict.items():
-            print(self.format_file_info(index, old_name, new_name))
-            index += 1
+        subtitle_files = {}
 
-        choice = input("请输入你不想修改的文件序号，如果全部修改，请直接按回车：")
-        if choice:
-            choices = choice.split()  # 分割输入的字符串
-            for choice in choices:
-                try:
-                    choice = int(choice)
-                    if 1 <= choice <= len(rename_dict):
-                        del rename_dict[list(rename_dict.keys())[choice - 1]]
+        # 处理所有的字幕文件
+        for root, dirs, files in os.walk(directory_path):
+            media_file = None
+            subtitles = []
+            for file in files:
+                file_path = os.path.join(root, file)
+                if file.endswith(tuple('.' + ext for ext in self.subtitle_suffix_list)):
+                    subtitles.append(file_path)
+                elif file.endswith(tuple('.' + ext for ext in self.video_suffix_list)):
+                    if media_file is None:
+                        media_file = file_path
                     else:
-                        print(f"输入的序号 {choice} 不在有效范围内，请重新输入。")
-                except ValueError:
-                    print("输入的不是有效的数字，请重新输入。")
-
-        for old_name, new_name in rename_dict.items():
-            if not os.path.exists(new_name):
-                print(Fore.GREEN + f"正在重命名：{os.path.basename(old_name)} -> {os.path.basename(new_name)}" + Style.RESET_ALL)
-                os.rename(old_name, new_name)
+                        # 如果有多个媒体文件，我们不处理这个文件夹
+                        break
             else:
-                print(Fore.RED + f"文件已存在，跳过重命名：{os.path.basename(new_name)}" + Style.RESET_ALL)
-        print(Fore.GREEN + "重命名完成" + Style.RESET_ALL)
+                # 如果只有一个媒体文件，我们处理字幕文件
+                if media_file is not None:
+                    new_media_name = media_files.get(media_file)
+                    if new_media_name is not None:
+                        # 获取媒体文件名的主要部分
+                        main_name_part = os.path.splitext(new_media_name)[0]
+                        for i, subtitle in enumerate(subtitles):
+                            new_name = main_name_part
+                            if len(subtitles) > 1:
+                                new_name += f".{i+1}"  # 添加后缀以区分不同的字幕文件
+                            new_name += os.path.splitext(subtitle)[1]  # 添加字幕文件的扩展名
+                            subtitle_files[subtitle] = new_name
+
+        return subtitle_files
+
+    def collect_files_info(self, parent_folder_path):
+        total_files_info = {}
+        total_filenames = []
+
+        for movie_folder in os.listdir(parent_folder_path):
+            movie_folder_path = os.path.join(parent_folder_path, movie_folder)
+            if not os.path.isdir(movie_folder_path):
+                continue
+
+            files_info, all_filenames = self.process_directory(movie_folder_path)
+            total_files_info.update(files_info)
+            total_filenames.extend(all_filenames)
+
+        print(Fore.RED + "文件名预处理完成。" + Style.RESET_ALL)
+        return total_files_info, total_filenames
+
+    def process_directory(self, directory_path: str) -> Tuple[Dict[str, Dict[str, str]], List[str]]:
+        """
+        遍历指定目录，处理所有媒体文件。
+
+        参数:
+        directory_path (str): 要处理的目录路径。
+
+        返回:
+        Tuple[Dict[str, Dict[str, str]], List[str]]: 包含两个元素的元组，第一个是文件路径到文件信息的映射字典，第二个是所有文件名的列表。
+        """
+        files_info = {}  # type: Dict[str, Dict[str, str]]
+        all_filenames = []  # type: List[str]
+
+        for root, dirs, files in os.walk(directory_path):
+            for filename in files:
+                try:
+                    file_path = os.path.join(root, filename)
+                    extension = os.path.splitext(filename)[1].lower().lstrip('.')
+
+                    # 处理媒体
+                    if extension in self.video_suffix_list:
+                        file_info = self.get_file_info(file_path)
+                        if file_info:
+                            files_info[file_path] = file_info
+                            all_filenames.append(filename)
+                except Exception as e:
+                    print(f"处理文件 {filename} 时发生错误: {e}")
+
+        return files_info, all_filenames
+
+    def process_file_info(self, file_path: str, files_info: Dict[str, Dict[str, str]], plex_api: PlexApi) -> Dict[str, str]:
+        """
+        处理文件信息。
+
+        参数:
+        file_path (str): 文件的路径。
+
+        返回:
+        Dict[str, str]: 一个字典，包含处理后的文件信息。
+        """
+        elements_from_file = files_info[file_path]
+        chinese_title = elements_from_file['chinese_title']
+        english_title = elements_from_file['english_title']
+        year = elements_from_file['year']
+        plex_info = self.search_movie(file_path, chinese_title, english_title, year)
+        if plex_info:
+            final_elements = elements_from_file.copy() # 复制一份文件信息
+            for key, value in plex_info.items():
+                if value and final_elements.get(key) is None:
+                    if isinstance(value, str):
+                        if key == 'english_title':
+                            # 英文标题转换为首字母大写的形式
+                            final_elements[key] = value.title().replace(' ', '.')
+                        else:
+                            # 其他元素全部转换为大写
+                            final_elements[key] = value.upper().replace(' ', '.')
+                    elif isinstance(value, int):
+                        # 将整数转换为字符串
+                        final_elements[key] = str(value)
+
+            # 使用 Plex 的中文标题（如果存在且包含中文字符）
+            if 'chinese_title' in plex_info and plex_info['chinese_title'] and any('\u4e00' <= char <= '\u9fff' for char in plex_info['chinese_title']):
+                final_elements['chinese_title'] = plex_info['chinese_title']
+
+            # 使用 Plex 的 HDR 信息（如果存在）
+            if 'hdr_info' in plex_info and plex_info['hdr_info']:
+                final_elements['hdr_info'] = plex_info['hdr_info']
+
+        else:
+            final_elements = elements_from_file  # 如果 Plex 无法匹配到电影信息，返回从文件名中提取的元素
+
+        # 处理最终元素大小写问题
+        for key, value in final_elements.items():
+            if isinstance(value, str):
+                if key == 'english_title':
+                    # 英文标题转换为首字母大写的形式
+                    final_elements[key] = value.title().replace(' ', '.')
+                elif key == 'bit_depth':
+                    # 保持 bit_depth 的值为小写
+                    final_elements[key] = value.lower()
+                else:
+                    # 其他元素全部转换为大写
+                    final_elements[key] = value.upper().replace(' ', '.')
+
+        #print("提取的信息：", final_elements)
+        return final_elements
 
     def get_file_info(self, file_path: str) -> Dict[str, str]:
         """
@@ -89,8 +257,9 @@ class MovieRenamer:
         返回:
         Dict[str, str]: 一个字典，包含从文件名中提取的信息。
         """
-        print(Fore.GREEN + f"正在处理的文件名: {os.path.basename(file_path)}" + Style.RESET_ALL)
+        print(Fore.GREEN + "文件正在提取元素: " + Style.RESET_ALL + f"{os.path.basename(file_path)}")
         file_name_no_ext, file_ext = os.path.splitext(os.path.basename(file_path))
+        file_ext = file_ext[1:]  # 获取不包含点号的扩展名
         file_name_no_ext = file_name_no_ext.replace('.', ' ')
         file_name_no_ext = file_name_no_ext.upper()
         elements_to_remove = ['%7C', '国语中字', '简英双字', '繁英雙字', '泰语中字', '3D', '国粤双语', r'\d+分钟版']
@@ -128,7 +297,7 @@ class MovieRenamer:
                     for match in matches:
                         file_name_no_ext = file_name_no_ext.replace(match, '')
         file_name_no_ext = file_name_no_ext.split('-')[0]
-        print(Fore.GREEN + f"剩余的文件名: {file_name_no_ext}" + Style.RESET_ALL)
+        #print(Fore.GREEN + f"剩余的文件名: {file_name_no_ext}" + Style.RESET_ALL)
         series_number_arabic = re.search(r'\b[2-5]\b', file_name_no_ext)
         series_number_roman = re.search(r'\b(?:M{0,3})(?:CM|CD|D?C{0,3})(?:XC|XL|L?X{0,3})(?:IX|IV|V?I{0,3})\b', file_name_no_ext)
         if series_number_arabic:
@@ -157,7 +326,7 @@ class MovieRenamer:
             chinese_title = re.search(r'[\u4e00-\u9fffA-Za-z0-9：，]+', parent_folder_name)
             if chinese_title:
                 elements['chinese_title'] = chinese_title.group(0)
-                print(Fore.GREEN + f"提取的中文标题: {elements['chinese_title']}" + Style.RESET_ALL)
+                #print(Fore.GREEN + f"提取的中文标题: {elements['chinese_title']}" + Style.RESET_ALL)
         english_title = re.search(r'[a-zA-Z0-9]+(\s[a-zA-Z0-9]+)*', file_name_no_ext)
 
         if english_title:
@@ -174,227 +343,155 @@ class MovieRenamer:
                 elements['chinese_title'] = chinese_title.group(0)
             if english_title:
                 elements['english_title'] = english_title.group(0)
-        print(elements)
+
         return elements
 
+    def search_movie(self, file_path: str, chinese_title: str = None, english_title: str = None, year: str = None) -> str:
+        file_name = os.path.basename(file_path)
+        print(Fore.GREEN + "PLEX正在提取元素:" + Style.RESET_ALL, file_name)
 
-    def search_movie(self, plex_api: PlexApi, chinese_title: str = None, english_title: str = None, year: str = None) -> Dict[str, str]:
-        """
-        从 Plex 搜索电影。
-
-        参数:
-        plex_api (PlexApi): PlexApi 的实例。
-        chinese_title (str): 电影的中文标题。
-        english_title (str): 电影的英文标题。
-        year (str): 电影的年份。
-
-        返回:
-        Dict[str, str]: 一个字典，包含从 Plex 中搜索到的电影信息。
-        """
         if chinese_title == english_title:
             english_title = None
-        try:
-            if chinese_title is not None:
-                print(Fore.GREEN + f"正在从 Plex 搜索: 中文标题={chinese_title}, 年份={year}" + Style.RESET_ALL)
-                search_endpoint = f"/search?query={chinese_title}"
-            else:
-                print(Fore.GREEN + f"正在从 Plex 搜索: 英文标题={chinese_title}, 年份={year}" + Style.RESET_ALL)
-                search_endpoint = f"/search?query={english_title}"
-            
-            search_url = plex_api.plex_url + search_endpoint
-            response = requests.get(search_url, headers=plex_api.headers)
-            movies = response.json()
-            
-            # 检查是否有匹配的媒体
-            if 'Metadata' in movies['MediaContainer']:
-                for media in movies['MediaContainer']['Metadata']:
-                    #print("media 字典的内容：", media)  # 打印 media 字典的内容
-                    try:
-                        file_path = media['Media'][0]['Part'][0]['file']
-                        #print("文件路径:", file_path)
-                    except (IndexError, KeyError):
-                        continue
-                    
-                    extracted_info = {}
-                    extracted_info['chinese_title'] = media.get('title')
-                    extracted_info['year'] = media.get('year')
-                    resolution = media.get('Media')[0].get('videoResolution')
-                    extracted_info['resolution'] = resolution + 'P' if resolution.lower() != '4k' else resolution
-                    bitrate_mbps = media.get('Media')[0].get('bitrate') / 8000   # 将比特率转换为兆字节每秒
-                    if bitrate_mbps <= 0.3:
-                        extracted_info['source'] = 'TS'
-                    elif 0.3 < bitrate_mbps <= 0.7:
-                        extracted_info['source'] = 'HQCAM'
-                    elif 0.7 < bitrate_mbps <= 1.5:
-                        extracted_info['source'] = 'HDTC'
-                    elif 1.5 < bitrate_mbps <= 3:
-                        extracted_info['source'] = 'DVDRIP'
-                    elif 3 < bitrate_mbps <= 5:
-                        extracted_info['source'] = 'HDRIP'
-                    elif 5 < bitrate_mbps <= 8:
-                        extracted_info['source'] = 'HDTV'
-                    elif 8 < bitrate_mbps <= 12:
-                        extracted_info['source'] = 'WEBRIP'
-                    elif 12 < bitrate_mbps <= 20:
-                        extracted_info['source'] = 'WEB-DL'
-                    elif 20 < bitrate_mbps <= 30:
-                        extracted_info['source'] = 'BDRIP'
-                    elif 30 < bitrate_mbps <= 50:
-                        extracted_info['source'] = 'BD'
-                    else:
-                        extracted_info['source'] = 'REMUX'
-                    extracted_info['codec'] = media.get('Media')[0].get('videoCodec').upper()
-                    extracted_info['audio_format'] = media.get('Media')[0].get('audioCodec').upper()
 
-                    return extracted_info  # 返回获取的媒体信息
-            else:
-                print(Fore.RED + "未找到匹配的媒体。尝试手动输入标题和年份进行搜索。" + Style.RESET_ALL)
-                manual_title = input("请输入电影的标题（如果想跳过，请直接按回车）：")
-                manual_year = input("请输入电影的年份（如果想跳过，请直接按回车）：")
-                
-                # 检查输入是否为空，如果为空则跳过
-                if not manual_title.strip() and not manual_year.strip():
-                    print("跳过当前文件的匹配。")
-                    return None
-                
-                return self.search_movie(plex_api, chinese_title=manual_title, year=manual_year)
+        movie_info_found = False
+        extracted_info = {}
 
-        except requests.exceptions.RequestException as e:
-            print(Fore.RED + f"无法连接到 Plex: {e}" + Style.RESET_ALL)
-            return None
+        if chinese_title is not None:
+            movies = self.plex_api.search_movie(chinese_title)
+        else:
+            movies = self.plex_api.search_movie(english_title)
 
-    def process_directory(self, directory_path, move_files, delete_other_files):
-        files_info = {}
-        all_filenames = []
+        if movies:
+            movie_info_found = True
+            media_list = movies.get('Media', [])
+            for media in media_list:
+                part_list = media.get('Part', [])
+                for part in part_list:
+                    if 'file' in part:
+                        file_path = part['file']
+                        file_name_in_part = os.path.basename(file_path)
+                        if file_name in file_name_in_part or file_name_in_part in file_name:
+                            extracted_info = {
+                                'chinese_title': movies.get('title', ''),
+                                'year': movies.get('year', ''),
+                                'resolution': self.resolve_resolution(media),
+                                'source': self.determine_source(media),
+                                'codec': media.get('videoCodec', '').upper(),
+                                'bit_depth': str(media.get('bitDepth', '8')) + 'bit',
+                                'hdr_info': self.get_hdr_info(media),
+                                'audio_format': media.get('audioCodec', '').upper()
+                            }
+                            print("提取PLEX的信息：", extracted_info)
+                            return extracted_info
 
-        for root, dirs, files in os.walk(directory_path):
-            for filename in files:
-                file_path = os.path.join(root, filename)
-                extension = os.path.splitext(filename)[1]
+        if not movie_info_found:
+            # 只有当没有找到电影信息时，才请求手动输入
+            print("未找到匹配的电影，请求手动输入")
+            manual_title = input("请输入电影的标题（如果想跳过，请直接按回车）：")
+            manual_year = input("请输入电影的年份（如果想跳过，请直接按回车）：")
+            if not manual_title.strip() and not manual_year.strip():
+                return os.path.basename(file_path)  # 返回原始的文件名，而不是None
+            return self.search_movie(file_path, chinese_title=manual_title, year=manual_year)
 
-                # 检查文件是否已经移动，如果已移动则跳过
-                if not os.path.exists(file_path):
-                    continue
+        return None
 
-                # 移动文件
-                if move_files and root != directory_path:
-                    target_path = os.path.join(directory_path, filename)
-                    if not os.path.exists(target_path):
-                        shutil.move(file_path, target_path)
-                        continue  # 移动文件后跳过后续处理
+    def resolve_resolution(self, media: Dict) -> str:
+        resolution = media.get('videoResolution', '').lower()
+        return resolution + 'P' if resolution != '4k' else resolution
 
-                # 删除指定扩展名的文件
-                if delete_other_files and extension in self.other_suffix_list:
-                    os.remove(file_path)
-                    continue  # 删除文件后跳过后续处理
-
-                # 处理媒体和字幕文件
-                if extension in self.video_suffix_list or extension in self.subtitle_suffix_list:
-                    file_info = self.get_file_info(file_path)
-                    if file_info:
-                        files_info[file_path] = file_info
-                        all_filenames.append(filename)
-
-        return files_info, all_filenames
-
-    def collect_files_info(self, parent_folder_path, move_files=True, delete_other_files=False):
-        print(Fore.GREEN + f"正在遍历文件夹: {parent_folder_path}" + Style.RESET_ALL)
-        total_files_info = {}
-        total_filenames = []
-
-        for movie_folder in os.listdir(parent_folder_path):
-            movie_folder_path = os.path.join(parent_folder_path, movie_folder)
-            if not os.path.isdir(movie_folder_path):
-                continue
-
-            files_info, all_filenames = self.process_directory(movie_folder_path, move_files, delete_other_files)
-            total_files_info.update(files_info)
-            total_filenames.extend(all_filenames)
-
-            # 清空旧信息并重新遍历目录，确保获取最新文件列表
-            if move_files:
-                total_files_info.clear()
-                total_filenames.clear()
-                updated_files_info, updated_filenames = self.process_directory(movie_folder_path, False, delete_other_files)
-                total_files_info.update(updated_files_info)
-                total_filenames.extend(updated_filenames)
-
-        print(Fore.GREEN + "文件预处理完成" + Style.RESET_ALL)
-        return total_files_info, total_filenames
+    def determine_source(self, media: Dict) -> str:
+        bitrate_mbps = media.get('bitrate', 0) / 8000
+        if bitrate_mbps <= 0.3:
+            return 'TS'
+        elif 0.3 < bitrate_mbps <= 0.7:
+            return 'HQCAM'
+        elif 0.7 < bitrate_mbps <= 1.5:
+            return 'HDTC'
+        elif 1.5 < bitrate_mbps <= 3:
+            return 'DVDRIP'
+        elif 3 < bitrate_mbps <= 5:
+            return 'HDRIP'
+        elif 5 < bitrate_mbps <= 8:
+            return 'HDTV'
+        elif 8 < bitrate_mbps <= 12:
+            return 'WEBRIP'
+        elif 12 < bitrate_mbps <= 20:
+            return 'WEB-DL'
+        elif 20 < bitrate_mbps <= 30:
+            return 'BDRIP'
+        elif 30 < bitrate_mbps <= 50:
+            return 'BD'
+        else:
+            return 'REMUX'
 
 
-    def process_file_info(self, file_path: str, plex_api: PlexApi) -> Dict[str, str]:
+    def get_hdr_info(self, media: Dict) -> str:
+        if 'Part' in media:
+            for part in media['Part']:
+                if 'Stream' in part:
+                    for stream in part['Stream']:
+                        display_title = stream.get('displayTitle', '')
+                        if display_title:
+                            display_title = display_title.upper()
+                            hdr_info = re.search(r'(DOLBY VISION|DOVI|DV|HDR10\+|HDR10|HLG|DISPLAYHDR)', display_title)
+                            if hdr_info:
+                                return hdr_info.group(0)
+        return 'SDR'
+
+
+    def rename_files(self, rename_dict: Dict[str, str], template: list):
         """
-        处理文件信息。
+        重命名文件。
 
         参数:
-        file_path (str): 文件的路径。
+        rename_dict (Dict[str, str]): 一个字典，包含旧文件名作为键，新文件名作为值。
+        template (list): 一个列表，包含文件名的组成部分。
 
         返回:
-        Dict[str, str]: 一个字典，包含处理后的文件信息。
+        无
         """
-        elements_from_file = self.get_file_info(file_path)
-        chinese_title = elements_from_file['chinese_title']
-        english_title = elements_from_file['english_title']
-        year = elements_from_file['year']
-        plex_info = self.search_movie(self.plex_api, chinese_title, english_title, year)
-        if plex_info:
-            final_elements = elements_from_file.copy() # 复制一份文件信息
-            for key, value in plex_info.items():
-                if value and final_elements.get(key) is None:
-                    if isinstance(value, str):
-                        if key == 'english_title':
-                            # 英文标题转换为首字母大写的形式
-                            final_elements[key] = value.title().replace(' ', '.')
-                        else:
-                            # 其他元素全部转换为大写
-                            final_elements[key] = value.upper().replace(' ', '.')
-                    elif isinstance(value, int):
-                        # 将整数转换为字符串
-                        final_elements[key] = str(value)
-            # 如果 Plex 有中文标题，并且标题中包含中文字符，则使用 Plex 的中文标题
-            if 'chinese_title' in plex_info and plex_info['chinese_title'] and any('\u4e00' <= char <= '\u9fff' for char in plex_info['chinese_title']):
-                final_elements['chinese_title'] = plex_info['chinese_title']
-            # 如果 Plex 的中文标题实际为英文，则不使用这个中文标题
-            elif 'chinese_title' in plex_info and plex_info['chinese_title'] and all('\u4e00' > char or char > '\u9fff' for char in plex_info['chinese_title']):
-                final_elements['chinese_title'] = None
-        else:
-            final_elements = elements_from_file  # 如果 Plex 无法匹配到电影信息，返回从文件名中提取的元素
+        index = 1
+        for old_name, new_name in rename_dict.items():
+            print(self.format_file_info(index, old_name, new_name))
+            index += 1
 
-        # 处理从文件名中提取的信息
-        for key, value in final_elements.items():
-            if isinstance(value, str):
-                if key == 'english_title':
-                    # 英文标题转换为首字母大写的形式
-                    final_elements[key] = value.title().replace(' ', '.')
-                else:
-                    # 其他元素全部转换为大写
-                    final_elements[key] = value.upper().replace(' ', '.')
+        choice = input("请输入你不想修改的文件序号，如果全部修改，请直接按回车：")
+        if choice:
+            choices = choice.split()  # 分割输入的字符串
+            for choice in choices:
+                try:
+                    choice = int(choice)
+                    if 1 <= choice <= len(rename_dict):
+                        del rename_dict[list(rename_dict.keys())[choice - 1]]
+                    else:
+                        print(f"输入的序号 {choice} 不在有效范围内，请重新输入。")
+                except ValueError:
+                    print("输入的不是有效的数字，请重新输入。")
 
-        return final_elements
+        for old_name, new_name in rename_dict.items():
+            if not os.path.exists(new_name):
+                print(Fore.GREEN + f"正在重命名：{os.path.basename(old_name)} -> {os.path.basename(new_name)}" + Style.RESET_ALL)
+                os.rename(old_name, new_name)
+            else:
+                print(Fore.RED + f"跳过重命名：{os.path.basename(new_name)}" + Style.RESET_ALL)
 
 
-    def main(self) -> None:
+
+    def format_file_info(self, index: int, old_name: str, new_name: str) -> str:
         """
-        主函数。
+        格式化文件信息的输出。
+        参数:
+        index (int): 文件的索引。
+        old_name (str): 文件的原始名称。
+        new_name (str): 文件的新名称。
+        返回:
+        str: 格式化后的文件信息。
         """
-        parent_folder_path = input("请输入父文件夹的路径：")
-        if not os.path.exists(parent_folder_path):
-            print(Fore.RED + "输入的路径不存在，请检查后重新输入。" + Fore.RESET)
-            return
-        files_info, all_filenames = self.collect_files_info(parent_folder_path)
-        rename_dict = {}
-        for file_path, elements_from_file in files_info.items():
-            final_elements = self.process_file_info(file_path, self.plex_api)
-            if final_elements:
-                new_name_elements = [str(final_elements[key]) for key in self.movie_title_format if final_elements[key] is not None]
-                new_filename = '.'.join(new_name_elements) + os.path.splitext(file_path)[1]
-                rename_dict[file_path] = os.path.join(os.path.dirname(file_path), new_filename)
-
-        self.rename_files(rename_dict, self.movie_title_format)
-        print(Fore.GREEN + "脚本执行完毕" + Style.RESET_ALL)
+        old_name = os.path.basename(old_name)
+        new_name = os.path.basename(new_name)
+        return f"{index}. 改前名: {Fore.BLUE}{old_name}{Style.RESET_ALL}\n{index}. 改后名: {Fore.GREEN}{new_name}{Style.RESET_ALL}"
 
 
 if __name__ == "__main__":
-    movie_renamer = MovieRenamer('config.json')
+    movie_renamer = MovieRenamer(CONFIG_FILE)
     movie_renamer.main()
