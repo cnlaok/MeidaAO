@@ -11,6 +11,7 @@ from api import PlexApi
 from config import ConfigManager
 from colorama import Fore, Style
 from typing import Dict, Optional, Union, List, Tuple
+from difflib import SequenceMatcher
 
 CONFIG_FILE = 'config.json'
 
@@ -101,48 +102,35 @@ class MovieRenamer:
                 rename_dict[file_path] = os.path.join(os.path.dirname(file_path), new_filename)
         return rename_dict or {}
 
-    def process_subtitle_files(self, directory_path: str, media_files: Dict[str, str]) -> Dict[str, str]:
-        """
-        遍历指定目录，处理所有字幕文件。
+# 定义一个函数来计算两个字符串的相似度
+def similar(a, b):
+    return SequenceMatcher(None, a, b).ratio()
 
-        参数:
-        directory_path (str): 要处理的目录路径。
-        media_files (Dict[str, str]): 媒体文件路径到新文件名的映射。
+def process_subtitle_files(self, directory_path: str, media_files: Dict[str, str]) -> Dict[str, str]:
+    subtitle_files = {}
 
-        返回:
-        Dict[str, str]: 字幕文件路径到新文件名的映射。
-        """
-        subtitle_files = {}
+    # 遍历指定目录下的所有文件
+    for root, dirs, files in os.walk(directory_path):
+        media_files_in_dir = [file for file in files if file.endswith(tuple('.' + ext for ext in self.video_suffix_list))]
+        subtitles_in_dir = [file for file in files if file.endswith(tuple('.' + ext for ext in self.subtitle_suffix_list))]
 
-        # 处理所有的字幕文件
-        for root, dirs, files in os.walk(directory_path):
-            media_file = None
-            subtitles = []
-            for file in files:
-                file_path = os.path.join(root, file)
-                if file.endswith(tuple('.' + ext for ext in self.subtitle_suffix_list)):
-                    subtitles.append(file_path)
-                elif file.endswith(tuple('.' + ext for ext in self.video_suffix_list)):
-                    if media_file is None:
-                        media_file = file_path
-                    else:
-                        # 如果有多个媒体文件，我们不处理这个文件夹
-                        break
-            else:
-                # 如果只有一个媒体文件，我们处理字幕文件
-                if media_file is not None:
-                    new_media_name = media_files.get(media_file)
-                    if new_media_name is not None:
-                        # 获取媒体文件名的主要部分
-                        main_name_part = os.path.splitext(new_media_name)[0]
-                        for i, subtitle in enumerate(subtitles):
-                            new_name = main_name_part
-                            if len(subtitles) > 1:
-                                new_name += f".{i+1}"  # 添加后缀以区分不同的字幕文件
-                            new_name += os.path.splitext(subtitle)[1]  # 添加字幕文件的扩展名
-                            subtitle_files[subtitle] = new_name
+        # 对于每个媒体文件，找到最相似的字幕文件
+        for media_file in media_files_in_dir:
+            max_similarity = 0
+            best_match = None
+            media_name = os.path.splitext(media_file)[0]
+            for subtitle_file in subtitles_in_dir:
+                subtitle_name = os.path.splitext(subtitle_file)[0]
+                similarity = similar(media_name, subtitle_name)
+                if similarity > max_similarity:
+                    max_similarity = similarity
+                    best_match = subtitle_file
+            if best_match is not None:
+                subtitle_files[os.path.join(root, best_match)] = media_files[os.path.join(root, media_file)]
+                subtitles_in_dir.remove(best_match)  # 从列表中移除已经匹配的字幕文件
 
-        return subtitle_files
+    return subtitle_files
+
 
     def collect_files_info(self, parent_folder_path):
         total_files_info = {}
