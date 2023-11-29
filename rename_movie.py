@@ -19,15 +19,16 @@ class MovieRenamer:
     def __init__(self, config_file):
         self.config_file = config_file
         self.config_manager = ConfigManager(self.config_file)
+        self.config = self.config_manager.config
         server_info_and_key = self.config_manager.get_server_info_and_key()
         self.plex_api = PlexApi(server_info_and_key['plex_url'], server_info_and_key['plex_token'])
-        self.video_suffix_list = ['mp4', 'mkv', 'flv', 'avi', 'mpg', 'mpeg', 'mov', 'ts', 'wmv', 'rm', 'rmvb', '3gp', '3g2', 'webm']
-        self.subtitle_suffix_list = ['srt', 'ass', 'stl', 'sub', 'smi', 'sami', 'ssa', 'vtt']
-        self.other_suffix_list = ['nfo', 'jpg', 'txt', 'png', 'log']
-        self.movie_title_format = ['chinese_title', 'english_title', 'year', 'resolution', 'source', 'codec', 'bit_depth', 'hdr_info', 'audio_format', 'edit_version']
-        self.move_files = False
-        self.delete_other_files = False
-
+        self.video_suffix_list = self.config['video_suffix_list']
+        self.subtitle_suffix_list = self.config['subtitle_suffix_list']
+        self.other_suffix_list = self.config['other_suffix_list']
+        self.movie_title_format = self.config['movie_title_format']
+        self.move_files = self.config['move_files']
+        self.delete_other_files = self.config['delete_other_files']
+        
 
     def main(self) -> None:
         """
@@ -126,7 +127,9 @@ class MovieRenamer:
                         best_match = subtitle_file
                 if best_match is not None:
                     # 获取媒体文件的新名称，但不包括扩展名
-                    new_name_base = os.path.splitext(media_files[os.path.join(root, media_file)])[0]
+                    file_path = os.path.join(root, media_file)
+                    if file_path in media_files:
+                        new_name_base = os.path.splitext(media_files[file_path])[0]
                     # 获取字幕文件的扩展名
                     subtitle_ext = os.path.splitext(best_match)[1]
                     # 将新名称的基础部分与字幕文件的扩展名结合，形成新的字幕文件名
@@ -263,8 +266,8 @@ class MovieRenamer:
         file_ext = file_ext[1:]  # 获取不包含点号的扩展名
         file_name_no_ext = file_name_no_ext.replace('.', ' ')
         file_name_no_ext = file_name_no_ext.upper()
-        elements_to_remove = ['%7C', '国语中字', '简英双字', '繁英雙字', '泰语中字', '3D', '国粤双语', 'HD中字', r'\d+分钟版']
-        for element in elements_to_remove:
+        self.elements_to_remove = self.config['elements_to_remove']
+        for element in self.elements_to_remove:
             file_name_no_ext = re.sub(element, '', file_name_no_ext)
         file_name_no_ext = re.sub(r'\b(REMUX|BDREMUX|BD-REMUX)\b', 'REMUX', file_name_no_ext, flags=re.IGNORECASE)
         file_name_no_ext = re.sub(r'\b(BLURAY|BD|BLU-RAY|BD1080P)\b', 'BD', file_name_no_ext, flags=re.IGNORECASE)
@@ -273,19 +276,11 @@ class MovieRenamer:
         file_name_no_ext = re.sub(r'\{.*?\}', '', file_name_no_ext)
         file_name_no_ext = re.sub(r'\[.*?\]', '', file_name_no_ext)
 
-        elements_regex = {
-            "year": r'\b(19[0-9]{2}|20[0-5][0-9])\b',
-            "resolution": r'\b(?:HD)?(480P|540P|720P|1080P|2160P|4K|8K)\b',
-            "source": r'\b(REMUX|BD|BDRIP|WEB-DL|WEBDL|WEBRIP|WEB|HR-HDTV|HRHDTV|HDTV|HDRIP|DVDRIP|DVDSCR|DVD|HDTC|TC|HQCAM|CAM|TS)\b',
-            "codec": r'\b(X264|H264|H 264|H\.264|X265|H265|H 265|H\.265|HEVC|H265版|H264版|VP8|VP9|AV1|VC1|MPEG1|MPEG2|MPEG-4|Theora|ProRes)\b',
-            "bit_depth": r'\b\d{1,2}BIT\b',
-            "hdr_info": r'(HDR10\+|DV|SDR|HDR10|HDR|DOLBY VISION|HLG|DISPLAYHDR)',
-            "audio_format": r'\b(MP3|AAC|WAV|FLAC|ALAC|APE|LPCM|DTS-HD MA|DTS-HD HR|DDP5 1|DTS:X|DTS-X|AC-3 EX|AC3EX|E-AC-3|DCA-MA|EAC3|TRUEHD|ATMOS|DTS|DD5 1|DD\+|AC3|DD|EX|DDL|7 1|5 1|DTS-HD\.MA\.TrueHD\.7\.1\.Atmos)\b',
-            "edit_version": r'\b(PROPER|REPACK|LIMITED|IMAX|UNRATE|R-RATE|SE|DC|DIRECTOR\'S CUT|THEATRICAL CUT|ANNIVERSARY EDITION|REMASTERED|OPEN MATTE)\b'
-        }
+        self.elements_regex = self.config['elements_regex']
 
-        elements = {key: None for key in elements_regex.keys()}
-        for key, regex in elements_regex.items():
+
+        elements = {key: None for key in self.elements_regex.keys()}
+        for key, regex in self.elements_regex.items():
             if key == 'year':
                 match = re.search(regex, file_name_no_ext, re.IGNORECASE)
                 if match:

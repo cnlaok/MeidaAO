@@ -12,25 +12,33 @@ from api import TMDBApi
 
 
 class LocalMediaRename:
-    def __init__(self, tmdb_key: str, debug: bool = True):
-        self.tmdb = TMDBApi(tmdb_key)
-        self.debug = debug
-        # ----Settings Start----
-        language_option = input("请选择语言：1. 中文(默认) 2. 英文 3. 日文\n")
-        if language_option == '2':
-            self.tmdb_language = "en-US"
-        elif language_option == '3':
-            self.tmdb_language = "ja-JP"
+    def __init__(self, config_file: str):
+        with open(config_file, 'r', encoding='utf-8') as f:
+            config = json.load(f)
+        self.tmdb = TMDBApi(config['TMDB_API_KEY'])
+        self.tmdb_language = self.select_language(config)
+        self.tv_name_format = config['tv_name_format']
+        self.video_suffix_list = config['video_suffix_list']
+        self.subtitle_suffix_list = config['subtitle_suffix_list']
+        self.rename_seasons = config['rename_seasons']
+        self.delete_files = config['delete_files']
+        self.debug = config['debug']
+        self.other_suffix_list = config['other_suffix_list'].split(',')
+
+    def select_language(self, config):
+        if config['ask_language_change']:
+            change_language = input("当前的语言选项是" + config['language_option'] + "。你想更改吗？（y/n）")
+            if change_language.lower() == 'y':
+                language_option = input("请选择语言：1. 中文 2. 英文 3. 日文\n")
+                if language_option == '2':
+                    return "en-US"
+                elif language_option == '3':
+                    return "ja-JP"
+                else:
+                    print(colorama.Fore.GREEN + "已默认设置为中文。" + colorama.Fore.RESET)
+                    return "zh-CN"
         else:
-            print(colorama.Fore.GREEN + "已默认设置为中文。" + colorama.Fore.RESET)
-            self.tmdb_language = "zh-CN"
-        # 文件重命名格式
-        self.tv_name_format = "{name}-S{season:0>2}E{episode:0>2}.{title}"
-        # 需要识别的视频及字幕格式
-        self.video_suffix_list = ['mp4', 'mkv', 'flv', 'avi', 'mpg', 'mpeg', 'mov', 'ts', 'wmv', 'rm', 'rmvb', '3gp', '3g2', 'webm']
-        self.subtitle_suffix_list = ['srt', 'ass', 'stl', 'sub', 'smi', 'sami', 'ssa', 'vtt']
-        # ------Settings End------
-        CONFIG_FILE = 'config.json'
+            return config['language_option']
 
     def rename_files(self, folder_path: str):
         for folder_name in os.listdir(folder_path):
@@ -282,21 +290,16 @@ class LocalMediaRename:
                 if delete_files:
                     file_list = os.listdir(sub_folder_path)
                     for file_name in file_list:
-                        if file_name.endswith(('.nfo', '.jpg', '.txt', '.png', '.log')):
+                        if file_name.endswith(tuple(self.other_suffix_list)):
                             os.remove(os.path.join(sub_folder_path, file_name))
 
 
 if __name__ == '__main__':
-    # 从config.json文件中读取tmdb_key
-    with open('config.json', 'r', encoding='utf-8') as f:
-        config = json.load(f)
-    tmdb_key = config['TMDB_API_KEY']
-
-
+    # 创建一个LocalMediaRename对象
+    renamer = LocalMediaRename('config.json')
     # 让用户输入根目录
     print(Fore.RED + '开始程序:注意输入的目录结构必须是【你的目录/剧集或电影文件夹/媒体文件或其他子目录】' + Style.RESET_ALL)
     root_folder_path = input("请输入你的目录的路径：")
-
-    renamer = LocalMediaRename(tmdb_key)
+    # 使用LocalMediaRename对象来重命名文件
     renamer.rename_files(root_folder_path)
-    renamer.rename_season_folders(root_folder_path, rename_seasons=False, delete_files=False)
+    renamer.rename_season_folders(root_folder_path, rename_seasons=renamer.rename_seasons, delete_files=renamer.delete_files)

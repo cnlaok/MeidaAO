@@ -30,6 +30,13 @@ class ConfigManager:
         if os.path.exists(self.config_file):
             with open(self.config_file, 'r', encoding='utf-8') as f:
                 self.config = json.load(f)
+            # 直接从配置中读取预定义的键
+            self.video_suffix_list = self.config.get('video_suffix_list', [])
+            self.subtitle_suffix_list = self.config.get('subtitle_suffix_list', [])
+            self.other_suffix_list = self.config.get('other_suffix_list', [])
+            self.movie_title_format = self.config.get('movie_title_format', '')
+            self.move_files = self.config.get('move_files', False)
+            self.delete_other_files = self.config.get('delete_other_files', False)
         self.check_config()
 
 
@@ -85,7 +92,8 @@ class ConfigManager:
     def save_config(self) -> None:
         # 保存配置到文件
         with open(self.config_file, 'w', encoding='utf-8') as f:
-            json.dump(self.config, f, ensure_ascii=False, indent=4)
+            json.dump(self.config, f, ensure_ascii=False, indent=4, separators=(',', ': '))
+
 
 
     def get_server_info_and_key(self) -> Dict[str, str]:
