@@ -32,16 +32,16 @@ MediaAO是从Plex和The Movie Database(TMDb) 获取剧集/电影信息，并对�
 | `VARIETY_SHOW_FOLDER` | 字符串（可选） |  | 综艺文件夹的路径 |
 | `language_option` | 字符串（可选） | `zh-CN` | 语言选项，例如"zh-CN"代表中文 |
 | `ask_language_change` | 布尔值（可选） | `false` | 是否询问改变语言 |
-| `video_suffix_list` | 字符串（可选） | `mp4,mkv,flv,avi,mpg,mpeg,mov,ts,wmv,rm,rmvb,3gp,3g2,webm` | 视频文件后缀列表，以逗号分隔 |
+| `video_suffix_list` | 字符串（可选） | 见详细说明 | 视频文件后缀列表，以逗号分隔 |
 | `subtitle_suffix_list` | 字符串（可选） | `srt,ass,stl,sub,smi,sami,ssa,vtt` | 字幕文件后缀列表，以逗号分隔 |
 | `other_suffix_list` | 字符串（可选） | `nfo,jpg,txt,png,log` | 其他文件后缀列表，以逗号分隔 |
-| `movie_title_format` | 字符串（可选） | `chinese_title,english_title,year,resolution,source,codec,audio_format,edit_version` | 电影标题格式，以逗号分隔的字段列表 |
+| `movie_title_format` | 字符串（可选） | 见详细说明 | 电影标题格式，以逗号分隔的字段列表 |
 | `debug` | 布尔值（可选） | `true` | 是否开启调试模式 |
 | `move_files` | 布尔值（可选） | `false` | 表示是否移动文件到指定目录下 |
 | `rename_seasons` | 布尔值（可选） | `false` | 是否重命名季度 |
 | `show_delete_files` | 布尔值（可选） | `false` | 是否删除剧集文件夹下的其他格式的文件 |
 | `movie_delete_files` | 布尔值（可选） | `false` | 是否删除电影文件夹下的其他格式的文件 |
-| `tv_name_format` | 字符串（可选） | `{name}-S{season:0>2}E{episode:0>2}.{title}` | 电视名称格式 |
+| `tv_name_format` | 字符串（可选） | 见详细说明 | 电视名称格式 |
 | `elements_to_remove` | 字符串（可选） | `%7C,国语中字,简英双字,繁英雙字,泰语中字,3D,国粤双语,HD中字,\\d+分钟版` | 需要从文件名中移除的元素 |
 | `elements_regex` | 对象（可选） | `{...}` | 使用正则表达式匹配的元素，包括年份、分辨率、来源、编码、位深、HDR信息、音频格式和编辑版本 |
 
