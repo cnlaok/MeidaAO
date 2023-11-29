@@ -90,3 +90,95 @@ MediaAO是一个强大的媒体文件管理和重命名工具。它的主要目�
 此工具仅供个人使用，作者不对任何由此工具引起的数据丢失或损坏负责。在使用此工具之前，请确保您已经备份了所有重要的文件。
 
 我们希望这个介绍能帮助您更好地理解和使用MediaAO。如果您有任何问题或建议，欢迎随时提出。祝您使用愉快！
+# MediaAO 1.0.7
+
+## Overview
+MediaAO is a powerful media file management and renaming tool. Its main goal is to help you organize and manage your movies and TV series, making them easier to search and access.
+
+## Runtime Environment
+- Python 3.6 or higher
+- Required Python libraries: `colorama`, others are standard libraries and do not need to be downloaded.
+- Requires access to the TMDB API and Plex API
+
+## Parameter Description
+- The parameter file is `config.py` in the same directory,
+
+```
+Fill in your parameters after `""` for all parameters, below is the explanation of each parameter,
+
+- `"PLEX_URL"`: URL of the Plex server.
+
+- `"PLEX_TOKEN"`: Token of Plex.
+
+- `"TMDB_API_KEY"`: API key of TMDB.
+
+- `"MOVIES_FOLDER"`: Path of the movie folder.
+
+- `"SHOWS_FOLDER"`: Path of the series folder.
+
+- `"ANIME_FOLDER"`: Path of the anime folder.
+
+- `"CHINESE_DRAMA_FOLDER"`: Path of the Chinese drama folder.
+
+- `"DOCUMENTARY_FOLDER"`: Path of the documentary folder.
+
+- `"AMERICAN_DRAMA_FOLDER"`: Path of the American drama folder.
+
+- `"JAPANESE_KOREAN_DRAMA_FOLDER"`: Path of the Japanese and Korean drama folder.
+
+- `"SPORTS_FOLDER"`: Path of the sports folder.
+
+- `"VARIETY_SHOW_FOLDER"`: Path of the variety show folder.
+
+
+- `"language_option"`: Language option, for example, "zh-CN" represents Chinese, default is Chinese.
+
+- `"ask_language_change"`: Whether to ask to change the language, the parameter is filled with ”true“ and ”false“, the default is not to select the language when executing.
+
+- `"video_suffix_list"`: Video file suffix list, separated by commas. Such as: "mp4,mkv,flv,avi,mpg,mpeg,mov,ts,wmv,rm,rmvb,3gp,3g2,webm", if you have other formats you can modify it yourself;
+
+- `"subtitle_suffix_list"`: Subtitle file suffix list, separated by commas. Such as: "srt,ass,stl,sub,smi,sami,ssa,vtt", if you have other formats you can modify it yourself;
+
+- `"other_suffix_list"`: Other file suffix list, separated by commas. Such as: "nfo,jpg,txt,png,log", if you have other formats you can modify it yourself;
+
+- `"movie_title_format"`: Movie title format, a list of fields separated by commas. Such as "chinese_title,english_title,year,resolution,source,codec,audio_format,edit_version", it means to arrange according to these elements, each element is separated by ".", you can adjust the order or remove some elements.
+
+- `"debug"`: Whether to turn on debug mode, affecting whether to output some detailed information, the default is true.
+
+- `"move_files"`: Indicates whether to move files to the specified directory, the parameter is filled with ”true“ and ”false“, the default is not to move.
+
+- `"rename_seasons"`: Whether to rename the season, the default is false, if you choose true, it will change the season folder to the format of ”Season 1“.
+
+- `"show_delete_files"`: Whether to delete other formats of files in the series folder, the parameter is filled with ”true“ and ”false“, the default is not to delete.
+
+- `"movie_delete_files"`: Whether to delete other formats of files in the movie folder, the parameter is filled with ”true“ and ”false“, the default is not to delete.
+
+- `"tv_name_format"`: TV name format, default: "{name}-S{season:0>2}E{episode:0>2}.{title}",.
+
+- `"elements_to_remove"`: Elements to be removed from the file name, for better handling of the file name, some elements are deleted first by default, such as: "%7C,国语中字,简英双字,繁英雙字,泰语中字,3D,国粤双语,HD中字,\\d+分钟版", you can improve it yourself.
+
+- `"elements_regex"`: Elements matched by regular expressions, including year, resolution, source, codec, bit depth, HDR information, audio format, and edit version. When these elements are processed regularly, you can adjust or supplement them yourself.
+```
+## User Guide
+1. First, you need to set your Plex server information and TMDB API key in the `config.json` file.
+2. Then, you can run `main.py` to start the program.
+3. The program will prompt you to select the matching mode, library type, naming rules, and parent folder path.
+4. Based on your selection, the program will start processing the folder and rename the folder according to the matched media information.
+
+## Precautions
+- Please make sure you have permission to modify the folder name.
+- Before using this tool, please back up your files in case of errors.
+- Please make sure your API key is correct, otherwise the program will not be able to obtain media information.
+
+## Implemented Features
+1. Plex matching mode: Rename the folder according to the media information in the Plex library.
+2. Tmdb matching mode: Rename the folder according to the media information in TMDB.
+3. Format conversion mode: Rename the folder according to the naming rules selected by the user.
+4. Clean naming mode: Delete illegal characters in the folder name.
+5. Batch change movie file name: Achieved by executing rename_movie.py
+6. Batch change series file name: Achieved by executing rename_show.py
+
+## Disclaimer
+This tool is for personal use only, and the author is not responsible for any data loss or damage caused by this tool. Before using this tool, please make sure you have backed up all important files.
+
+We hope this introduction can help you better understand and use MediaAO. If you have any questions or suggestions, feel free to raise them at any time. Enjoy using it!
