@@ -7,6 +7,7 @@ import os
 import time
 import json
 import colorama
+from colorama import Fore, Style
 from api import TMDBApi
 
 
@@ -293,7 +294,8 @@ if __name__ == '__main__':
 
 
     # 让用户输入根目录
-    root_folder_path = input("请输入根目录：")
+    print(Fore.RED + '开始程序:注意输入的目录结构必须是【你的目录/剧集或电影文件夹/媒体文件或其他子目录】' + Style.RESET_ALL)
+    root_folder_path = input("请输入你的目录的路径：")
 
     renamer = LocalMediaRename(tmdb_key)
     renamer.rename_files(root_folder_path)

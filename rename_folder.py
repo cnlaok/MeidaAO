@@ -77,7 +77,7 @@ class MediaRenamer:
             print(Fore.RED + "无效的命名规则。请输入1到3之间的数字。" + Style.RESET_ALL)
             return None
 
-        parent_folder_path = input("请输入父文件夹的路径：")
+        parent_folder_path = input("请输入你的目录路径：")
         if not os.path.isdir(parent_folder_path):
             print(Fore.RED + "无效的路径。请输入一个有效的目录路径。" + Style.RESET_ALL)
             return None
@@ -274,8 +274,7 @@ class MediaRenamer:
                         destination = os.path.join(target_path, filename)
                         if not os.path.exists(destination):
                             shutil.move(source, destination)
-                        else:
-                            print(f"跳过移动。")
+
                 else:
                     os.rename(folder_path, target_path)
 
@@ -331,8 +330,9 @@ class MediaRenamer:
 # 主函数
 def main() -> None:
     # 创建MediaRenamer实例
+    print(Fore.RED + '开始程序:注意输入的目录结构必须是【你的目录/剧集或电影文件夹/媒体文件或其他子目录】' + Style.RESET_ALL)
     media_renamer: MediaRenamer = MediaRenamer()
-    print(Fore.RED + '开始程序:' + Style.RESET_ALL)
+    
 
     # 根据匹配模式执行相应的函数
     if media_renamer.match_mode_index == 4:

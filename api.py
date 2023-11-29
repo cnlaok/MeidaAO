@@ -5,7 +5,6 @@
 import json
 import requests
 from typing import Union, List, Dict, Optional
-from tqdm import tqdm
 from config import ConfigManager
 import time
 from colorama import Fore, Style
@@ -38,7 +37,7 @@ class PlexApi:
                 response = requests.get(search_url, headers=self.headers)
                 response.raise_for_status()
             except requests.exceptions.RequestException as e:
-                print(Fore.RED + f"请求失败，错误信息：总共会重复请求3次，3次后跳过。" + Style.RESET_ALL)
+                print(Fore.RED + "请求失败，错误信息：总共会重复请求3次，3次后跳过。" + Style.RESET_ALL)
                 if attempt < max_attempts - 1:
                     wait_time = 2 ** attempt
                     print(f"等待{wait_time}秒后重试...")
@@ -186,7 +185,7 @@ class TMDBApi:
                 response = requests.get(url, params=params)
                 response.raise_for_status()
             except requests.exceptions.RequestException as e:
-                print(Fore.RED + f"请求失败，错误信息：总共会重复请求3次，3次后跳过。" + Style.RESET_ALL)
+                print(Fore.RED + "请求失败，错误信息：总共会重复请求3次，3次后跳过。" + Style.RESET_ALL)
                 if attempt < max_attempts - 1:
                     wait_time = 2 ** attempt
                     print(f"等待{wait_time}秒后重试...")
