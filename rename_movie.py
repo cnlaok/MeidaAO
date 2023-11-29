@@ -27,7 +27,7 @@ class MovieRenamer:
         self.other_suffix_list = self.config['other_suffix_list']
         self.movie_title_format = self.config['movie_title_format']
         self.move_files = self.config['move_files']
-        self.delete_other_files = self.config['delete_other_files']
+        self.movie_delete_files = self.config['movie_delete_files']
         
 
     def main(self) -> None:
@@ -41,7 +41,7 @@ class MovieRenamer:
             return
         print(Fore.GREEN + f"预处理所有文件名: {parent_folder_path}" + Style.RESET_ALL)
         # 在处理文件信息之前，先预处理文件
-        if self.move_files or self.delete_other_files:
+        if self.move_files or self.movie_delete_files:
             self.move_and_delete_files(parent_folder_path)
 
         rename_dict = self.process_movie_files(parent_folder_path)
@@ -76,7 +76,7 @@ class MovieRenamer:
                         shutil.move(file_path, target_path)
 
                 # 删除指定扩展名的文件
-                if self.delete_other_files and extension in self.other_suffix_list:
+                if self.movie_delete_files and extension in self.other_suffix_list:
                     os.remove(file_path)
 
             # 检查并删除空目录
@@ -277,8 +277,6 @@ class MovieRenamer:
         file_name_no_ext = re.sub(r'\[.*?\]', '', file_name_no_ext)
 
         self.elements_regex = self.config['elements_regex']
-
-
         elements = {key: None for key in self.elements_regex.keys()}
         for key, regex in self.elements_regex.items():
             if key == 'year':
