@@ -16,7 +16,7 @@ MediaAO是从Plex和The Movie Database(TMDb) 获取剧集/电影信息，并对�
 
 以下是调整后的表格：
 
-| 参数 |  类型   | 默认值 | 说明 |
+| 参数 |  参数类型控制   | 默认值 | 说明 |
 | :--- | :--- | :--- | :--- |
 | `PLEX_URL` | 必填 |  | Plex服务器的URL |
 | `PLEX_TOKEN` | 必填 |  | Plex的令牌 |
