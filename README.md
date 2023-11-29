@@ -5,9 +5,68 @@ MediaAO是一个强大的媒体文件管理和重命名工具。它的主要目�
 
 ## 运行环境
 - Python 3.6 或更高版本
-- 需要安装的Python库：`requests`, `os`, `re`, `logging`
+- 需要安装的Python库：`colorama`，其他均为python的标准库无需下载。
 - 需要有访问TMDB API和Plex API的权限
 
+## 参数说明
+- 参数文件为同目录下config.py,
+
+```
+所有参数后 `""` 里填写你的参数，以下是各个参数的说明，
+
+- `"PLEX_URL"`: Plex服务器的URL。
+
+- `"PLEX_TOKEN"`: Plex的令牌。
+
+- `"TMDB_API_KEY"`: TMDB的API密钥。
+
+- `"MOVIES_FOLDER"`: 电影文件夹的路径。
+
+- `"SHOWS_FOLDER"`: 剧集文件夹的路径。
+
+- `"ANIME_FOLDER"`: 动漫文件夹的路径。
+
+- `"CHINESE_DRAMA_FOLDER"`: 国剧文件夹的路径。
+
+- `"DOCUMENTARY_FOLDER"`: 纪录片文件夹的路径。
+
+- `"AMERICAN_DRAMA_FOLDER"`: 美剧文件夹的路径。
+
+- `"JAPANESE_KOREAN_DRAMA_FOLDER"`: 日韩剧文件夹的路径。
+
+- `"SPORTS_FOLDER"`: 体育文件夹的路径。
+
+- `"VARIETY_SHOW_FOLDER"`: 综艺文件夹的路径。
+
+
+- `"language_option"`: 语言选项，例如"zh-CN"代表中文，默认中文。
+
+- `"ask_language_change"`: 是否询问改变语言，参数填写 ”true“ 和 ”false“，默认执行时不选择语言。
+
+- `"video_suffix_list"`: 视频文件后缀列表，以逗号分隔。如："mp4,mkv,flv,avi,mpg,mpeg,mov,ts,wmv,rm,rmvb,3gp,3g2,webm",如果你有其他格式可以自己修改；
+
+- `"subtitle_suffix_list"`: 字幕文件后缀列表，以逗号分隔。如："srt,ass,stl,sub,smi,sami,ssa,vtt",如果你有其他格式可以自己修改；
+
+- `"other_suffix_list"`: 其他文件后缀列表，以逗号分隔。如："nfo,jpg,txt,png,log",如果你有其他格式可以自己修改；
+
+- `"movie_title_format"`: 电影标题格式，以逗号分隔的字段列表。如"chinese_title,english_title,year,resolution,source,codec,audio_format,edit_version",表示按这些元素排列，每个元素以”.“分割，你可以调整顺序或者去掉某些元素。
+
+- `"debug"`: 是否开启调试模式，影响是否输出一些详细信息，默认为true。
+
+- `"move_files"`: 表示是否移动文件到指定目录下，参数填写 ”true“ 和 ”false“，默认不移动。
+
+- `"rename_seasons"`: 是否重命名季度，默认false，如果选择true则会改季文件夹为 ”Season 1“ 这样的格式。
+
+- `"show_delete_files"`: 是否删除剧集文件夹下的其他格式的文件，参数填写 ”true“ 和 ”false“，默认不删除。
+
+- `"movie_delete_files"`: 是否删除电影文件夹下的其他格式的文件，参数填写 ”true“ 和 ”false“，默认不删除。
+
+- `"tv_name_format"`: 电视名称格式，默认："{name}-S{season:0>2}E{episode:0>2}.{title}",。
+
+- `"elements_to_remove"`: 需要从文件名中移除的元素，为更好处理文件名，默认首先删除一些元素，例如："%7C,国语中字,简英双字,繁英雙字,泰语中字,3D,国粤双语,HD中字,\\d+分钟版"，可以自己完善。
+
+- `"elements_regex"`: 使用正则表达式匹配的元素，包括年份、分辨率、来源、编码、位深、HDR信息、音频格式和编辑版本。时这些元素的正则处理，可以自己调整或补充。
+```
 ## 使用指南
 1. 首先，您需要在`config.json`文件中设置您的Plex服务器信息和TMDB API密钥。
 2. 然后，您可以运行`main.py`来启动程序。
@@ -31,34 +90,3 @@ MediaAO是一个强大的媒体文件管理和重命名工具。它的主要目�
 此工具仅供个人使用，作者不对任何由此工具引起的数据丢失或损坏负责。在使用此工具之前，请确保您已经备份了所有重要的文件。
 
 我们希望这个介绍能帮助您更好地理解和使用MediaAO。如果您有任何问题或建议，欢迎随时提出。祝您使用愉快！
-# MediaAO
-
-## Feature Overview
-MediaAO is a robust tool for managing and renaming media files. Its primary goal is to help you organize your movie and TV show collections, making them more searchable and accessible.
-
-## System Requirements
-- Python 3.6 or higher
-- Required Python libraries: `requests`, `os`, `re`, `logging`
-- Access to TMDB API and Plex API
-
-## How to Use
-1. First, you need to set up your Plex server information and TMDB API key in the `config.json` file.
-2. Then, you can run `main.py` to start the program.
-3. The program will prompt you to choose the match mode, library type, naming rule, and parent folder path.
-4. Based on your choices, the program will start processing folders and rename them according to the matched media information.
-
-## Precautions
-- Please ensure that you have the necessary permissions to rename folders.
-- Please back up your files before using this tool to prevent any accidental loss or damage.
-- Ensure that your API keys are correct; otherwise, the program will not be able to retrieve media information.
-
-## Implemented Features
-1. Plex Match Mode: Renames folders based on media information in the Plex library.
-2. TMDB Match Mode: Renames folders based on media information in TMDB.
-3. Format Conversion Mode: Renames folders according to the user-selected naming rule.
-4. Clean Naming Mode: Removes illegal characters from folder names.
-
-## Disclaimer
-This tool is for personal use only. The author is not responsible for any data loss or damage caused by this tool. Please ensure that you have backed up all important files before using this tool.
-
-We hope this introduction helps you understand and use MediaAO better. If you have any questions or suggestions, feel free to raise them at any time. Enjoy using MediaAO!
