@@ -13,17 +13,52 @@
     "VARIETY_SHOW_FOLDER": "",
     "language_option": "zh-CN",
     "ask_language_change": false,
-    "video_suffix_list": "mp4,mkv,flv,avi,mpg,mpeg,mov,ts,wmv,rm,rmvb,3gp,3g2,webm",
-    "subtitle_suffix_list": "srt,ass,stl,sub,smi,sami,ssa,vtt",
+    "video_suffix_list": [
+        "mp4",
+        "mkv",
+        "flv",
+        "avi",
+        "mpg",
+        "mpeg",
+        "mov",
+        "ts",
+        "wmv",
+        "rm",
+        "rmvb",
+        "3gp",
+        "3g2",
+        "webm"
+    ],
+    "subtitle_suffix_list": [
+        "srt",
+        "ass",
+        "stl",
+        "sub",
+        "smi",
+        "sami",
+        "ssa",
+        "vtt"
+    ],
     "other_suffix_list": "nfo,jpg,txt,png,log",
-    "movie_title_format": "chinese_title,english_title,year,resolution,source,codec,audio_format,edit_version",
+    "movie_title_format": [
+        "chinese_title",
+        "english_title",
+        "year",
+        "resolution",
+        "source",
+        "codec",
+        "audio_format",
+        "edit_version"
+    ],
     "debug": true,
-    "rename_seasons": false,
-    "delete_files": false,
     "move_files": false,
-    "delete_other_files": false,
+    "rename_seasons": false,
+    "show_delete_files": false,
+    "movie_delete_files": false,
     "tv_name_format": "{name}-S{season:0>2}E{episode:0>2}.{title}",
-    "elements_to_remove": "%7C,国语中字,简英双字,繁英雙字,泰语中字,3D,国粤双语,HD中字,\\d+分钟版",
+    "elements_to_remove": [
+        "%7C,国语中字,简英双字,繁英雙字,泰语中字,3D,国粤双语,HD中字,\\d+分钟版"
+    ],
     "elements_regex": {
         "year": "\\b(19[0-9]{2}|20[0-5][0-9])\\b",
         "resolution": "\\b(?:HD)?(480P|540P|720P|1080P|2160P|4K|8K)\\b",
@@ -34,4 +69,5 @@
         "audio_format": "\\b(MP3|AAC|WAV|FLAC|ALAC|APE|LPCM|DTS-HD MA|DTS-HD HR|DDP5 1|DTS:X|DTS-X|AC-3 EX|AC3EX|E-AC-3|DCA-MA|EAC3|TRUEHD|ATMOS|DTS|DD5 1|DD\\+|AC3|DD|EX|DDL|7 1|5 1|DTS-HD\\.MA\\.TrueHD\\.7\\.1\\.Atmos)\\b",
         "edit_version": "\\b(PROPER|REPACK|LIMITED|IMAX|UNRATE|R-RATE|SE|DC|DIRECTOR'S CUT|THEATRICAL CUT|ANNIVERSARY EDITION|REMASTERED|OPEN MATTE)\\b"
     }
+}
 }
