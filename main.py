@@ -18,7 +18,7 @@ def check_and_install_libraries(libraries):
                 print(f"已跳过库 '{library}' 的安装。")
 
 def run_script():
-    libraries = ['os', 'json', 'typing', 'requests', 'colorama', 'api', 'config']
+    libraries = ['colorama']
     check_and_install_libraries(libraries)
 
     # 创建配置管理对象，并加载配置
