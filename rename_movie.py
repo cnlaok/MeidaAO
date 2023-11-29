@@ -112,8 +112,8 @@ class MovieRenamer:
 
     def process_subtitle_files(self, directory_path, media_files):
         subtitle_files = {}
+        media_files_in_dir = [file for root, dirs, files in os.walk(directory_path) for file in files if file.endswith(tuple('.' + ext for ext in self.video_suffix_list))]
         for root, dirs, files in os.walk(directory_path):
-            media_files_in_dir = [file for file in files if file.endswith(tuple('.' + ext for ext in self.video_suffix_list))]
             subtitles_in_dir = [file for file in files if file.endswith(tuple('.' + ext for ext in self.subtitle_suffix_list))]
             for media_file in media_files_in_dir:
                 max_similarity = 0
