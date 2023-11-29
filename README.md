@@ -1,16 +1,51 @@
-# MediaAO 1.0.7
+# MediaAO
 
 ## 功能概述
-MediaAO是一个强大的媒体文件管理和重命名工具。它的主要目标是帮助您整理和管理您的电影和电视剧集，使它们更易于搜索和访问。
+MediaAO是从Plex和The Movie Database(TMDb) 获取剧集/电影信息，并对本地指定媒体文件/文件夹重命名，便于播放器刮削识别剧集/电影。测试Plex,Infuse均可正确识别媒体信息。
 
 ## 运行环境
-- Python 3.6 或更高版本
-- 需要安装的Python库：`colorama`，其他均为python的标准库无需下载。
+- Python 3.6 或更高版本，建议使用 3.10 以上版本。
+- 需要安装的Python库：`colorama`，其他均为python的标准库无需下载，程序自带检查安装代码，用户确定即可。
 - 需要有访问TMDB API和Plex API的权限
+- 首次运行会要去输入 TMDb API 密钥， 用于获取 TMDb 电影/剧集信息，可前往 TMDb 官网免费申请，链接：https://developers.themoviedb.org/3/getting-started/introduction
+
 
 ## 参数说明
 - 参数文件为同目录下config.py,
+在GitHub的Markdown渲染中，表格的宽度是自动调整的，基于每列的内容。GitHub的Markdown解析器不支持HTML或CSS样式，因此我们不能直接控制列的宽度。但是，我们可以通过调整表格的格式和内容来改善其在GitHub上的显示。
 
+以下是调整后的表格：
+
+| 参数 | 类型 | 默认值 | 说明 |
+| :--- | :--- | :--- | :--- |
+| `PLEX_URL` | 字符串（必填） |  | Plex服务器的URL |
+| `PLEX_TOKEN` | 字符串（必填） |  | Plex的令牌 |
+| `TMDB_API_KEY` | 字符串（必填） |  | TMDB的API密钥 |
+| `MOVIES_FOLDER` | 字符串（可选） |  | 电影文件夹的路径 |
+| `SHOWS_FOLDER` | 字符串（可选） |  | 剧集文件夹的路径 |
+| `ANIME_FOLDER` | 字符串（可选） |  | 动漫文件夹的路径 |
+| `CHINESE_DRAMA_FOLDER` | 字符串（可选） |  | 国剧文件夹的路径 |
+| `DOCUMENTARY_FOLDER` | 字符串（可选） |  | 纪录片文件夹的路径 |
+| `AMERICAN_DRAMA_FOLDER` | 字符串（可选） |  | 美剧文件夹的路径 |
+| `JAPANESE_KOREAN_DRAMA_FOLDER` | 字符串（可选） |  | 日韩剧文件夹的路径 |
+| `SPORTS_FOLDER` | 字符串（可选） |  | 体育文件夹的路径 |
+| `VARIETY_SHOW_FOLDER` | 字符串（可选） |  | 综艺文件夹的路径 |
+| `language_option` | 字符串（可选） | `zh-CN` | 语言选项，例如"zh-CN"代表中文 |
+| `ask_language_change` | 布尔值（可选） | `false` | 是否询问改变语言 |
+| `video_suffix_list` | 字符串（可选） | `mp4,mkv,flv,avi,mpg,mpeg,mov,ts,wmv,rm,rmvb,3gp,3g2,webm` | 视频文件后缀列表，以逗号分隔 |
+| `subtitle_suffix_list` | 字符串（可选） | `srt,ass,stl,sub,smi,sami,ssa,vtt` | 字幕文件后缀列表，以逗号分隔 |
+| `other_suffix_list` | 字符串（可选） | `nfo,jpg,txt,png,log` | 其他文件后缀列表，以逗号分隔 |
+| `movie_title_format` | 字符串（可选） | `chinese_title,english_title,year,resolution,source,codec,audio_format,edit_version` | 电影标题格式，以逗号分隔的字段列表 |
+| `debug` | 布尔值（可选） | `true` | 是否开启调试模式 |
+| `move_files` | 布尔值（可选） | `false` | 表示是否移动文件到指定目录下 |
+| `rename_seasons` | 布尔值（可选） | `false` | 是否重命名季度 |
+| `show_delete_files` | 布尔值（可选） | `false` | 是否删除剧集文件夹下的其他格式的文件 |
+| `movie_delete_files` | 布尔值（可选） | `false` | 是否删除电影文件夹下的其他格式的文件 |
+| `tv_name_format` | 字符串（可选） | `{name}-S{season:0>2}E{episode:0>2}.{title}` | 电视名称格式 |
+| `elements_to_remove` | 字符串（可选） | `%7C,国语中字,简英双字,繁英雙字,泰语中字,3D,国粤双语,HD中字,\\d+分钟版` | 需要从文件名中移除的元素 |
+| `elements_regex` | 对象（可选） | `{...}` | 使用正则表达式匹配的元素，包括年份、分辨率、来源、编码、位深、HDR信息、音频格式和编辑版本 |
+
+在这个调整后的表格中，我将"类型"列中的"必填"和"可选"标签直接添加到了参数名中，以便在不增加额外列的情况下提供这些信息。希望这个答案对您有所帮助！
 ```
 所有参数后 `""` 里填写你的参数，以下是各个参数的说明，
 
