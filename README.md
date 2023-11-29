@@ -3,6 +3,9 @@
 ## 功能概述
 MediaAO是从Plex和The Movie Database(TMDb) 获取剧集/电影信息，并对本地指定媒体文件/文件夹重命名，便于播放器刮削识别剧集/电影。测试Plex,Infuse均可正确识别媒体信息。
 
+![1](1.gif)
+
+
 ## 运行环境
 - Python 3.6 或更高版本，建议使用 3.10 以上版本。
 - 需要安装的Python库：`colorama`，其他均为python的标准库无需下载，程序自带检查安装代码，用户确定即可。
