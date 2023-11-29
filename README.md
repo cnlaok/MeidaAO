@@ -52,31 +52,6 @@ MediaAO是从Plex和The Movie Database(TMDb) 获取剧集/电影信息，并对�
 ```
 所有参数后 `""` 里填写你的参数，以下是各个参数的说明，
 
-- `"PLEX_URL"`: Plex服务器的URL。
-
-- `"PLEX_TOKEN"`: Plex的令牌。
-
-- `"TMDB_API_KEY"`: TMDB的API密钥。
-
-- `"MOVIES_FOLDER"`: 电影文件夹的路径。
-
-- `"SHOWS_FOLDER"`: 剧集文件夹的路径。
-
-- `"ANIME_FOLDER"`: 动漫文件夹的路径。
-
-- `"CHINESE_DRAMA_FOLDER"`: 国剧文件夹的路径。
-
-- `"DOCUMENTARY_FOLDER"`: 纪录片文件夹的路径。
-
-- `"AMERICAN_DRAMA_FOLDER"`: 美剧文件夹的路径。
-
-- `"JAPANESE_KOREAN_DRAMA_FOLDER"`: 日韩剧文件夹的路径。
-
-- `"SPORTS_FOLDER"`: 体育文件夹的路径。
-
-- `"VARIETY_SHOW_FOLDER"`: 综艺文件夹的路径。
-
-
 - `"language_option"`: 语言选项，例如"zh-CN"代表中文，默认中文。
 
 - `"ask_language_change"`: 是否询问改变语言，参数填写 ”true“ 和 ”false“，默认执行时不选择语言。
