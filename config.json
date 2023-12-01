@@ -13,49 +13,16 @@
     "VARIETY_SHOW_FOLDER": "",
     "language_option": "zh-CN",
     "ask_language_change": false,
-    "video_suffix_list": [
-        "mp4",
-        "mkv",
-        "flv",
-        "avi",
-        "mpg",
-        "mpeg",
-        "mov",
-        "ts",
-        "wmv",
-        "rm",
-        "rmvb",
-        "3gp",
-        "3g2",
-        "webm"
-    ],
-    "subtitle_suffix_list": [
-        "srt",
-        "ass",
-        "stl",
-        "sub",
-        "smi",
-        "sami",
-        "ssa",
-        "vtt"
-    ],
+    "video_suffix_list": "mp4,mkv,flv,avi,mpg,mpeg,mov,ts,wmv,rm,rmvb,3gp,3g2,webm",
+    "subtitle_suffix_list": "srt,ass,stl,sub,smi,sami,ssa,vtt",
     "other_suffix_list": "nfo,jpg,txt,png,log",
-    "movie_title_format": [
-        "chinese_title",
-        "english_title",
-        "year",
-        "resolution",
-        "source",
-        "codec",
-        "audio_format",
-        "edit_version"
-    ],
+    "movie_title_format": "chinese_title,english_title,year,resolution,source,codec,audio_format,edit_version",
     "debug": true,
     "move_files": false,
     "rename_seasons": false,
     "show_delete_files": false,
     "movie_delete_files": false,
-    "append_data": true,
+    "append_data": false,
     "tv_name_format": "{name}-S{season:0>2}E{episode:0>2}.{title}",
     "elements_to_remove": [
         "%7C,国语中字,简英双字,繁英雙字,泰语中字,3D,国粤双语,HD中字,\\d+分钟版"
@@ -69,25 +36,5 @@
         "hdr_info": "(HDR10\\+|DV|SDR|HDR10|HDR|DOLBY VISION|HLG|DISPLAYHDR)",
         "audio_format": "\\b(MP3|AAC|WAV|FLAC|ALAC|APE|LPCM|DTS-HD MA|DTS-HD HR|DDP5 1|DTS:X|DTS-X|AC-3 EX|AC3EX|E-AC-3|DCA-MA|EAC3|TRUEHD|ATMOS|DTS|DD5 1|DD\\+|AC3|DD|EX|DDL|7 1|5 1|DTS-HD\\.MA\\.TrueHD\\.7\\.1\\.Atmos)\\b",
         "edit_version": "\\b(PROPER|REPACK|LIMITED|IMAX|UNRATE|R-RATE|SE|DC|DIRECTOR'S CUT|THEATRICAL CUT|ANNIVERSARY EDITION|REMASTERED|OPEN MATTE)\\b"
-    },
-    "match_modes": [
-        "Plex匹配模式",
-        "TMDB匹配模式",
-        "格式转换模式",
-        "清理命名模式"
-    ],
-    "library_types": [
-        "电影",
-        "剧集"
-    ],
-    "naming_rules": [
-        "中文名 (年份)",
-        "中文名 (年份) {tmdb-id}",
-        "中文名.(年份).{tmdb-id}"
-    ],
-    "folder_title_format": {
-        "1": "{title} ({year})",
-        "2": "{title} ({year}) {tmdbid}",
-        "3": "{title}.{year}.{tmdbid}"
     }
 }
