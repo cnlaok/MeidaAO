@@ -1,10 +1,18 @@
 import os
 import importlib
 import subprocess
+from typing import List
 from colorama import Fore, Style
 from config import ConfigManager  # 导入配置管理类
 
-def check_and_install_libraries(libraries):
+
+def check_and_install_libraries(libraries: List[str]) -> None:
+    """
+    检查并安装所需的库。
+
+    参数:
+        libraries (List[str]): 需要检查的库的列表。
+    """
     for library in libraries:
         try:
             importlib.import_module(library)
@@ -17,7 +25,11 @@ def check_and_install_libraries(libraries):
             else:
                 print(f"已跳过库 '{library}' 的安装。")
 
-def run_script():
+
+def run_script() -> None:
+    """
+    运行脚本的主函数。
+    """
     libraries = ['colorama']
     check_and_install_libraries(libraries)
 
@@ -29,7 +41,6 @@ def run_script():
     if config_manager.check_config():
         print("配置文件检查完毕，所有配置都已完整。")
     else:
-        print("配置文件不完整，正在补充完整...")
         config_manager.save_config()
         print("配置文件已补充完整。")
 
@@ -50,6 +61,7 @@ def run_script():
         print("3. 个别原文件夹或者文件本身命名信息错误的需要自己根据TMDB信息手动输入匹配")
     else:
         print("输入的序号无效。")
+
 
 if __name__ == "__main__":
     run_script()

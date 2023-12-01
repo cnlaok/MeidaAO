@@ -21,7 +21,7 @@ class LocalMediaRename:
         self.video_suffix_list = config['video_suffix_list']
         self.subtitle_suffix_list = config['subtitle_suffix_list']
         self.rename_seasons = config['rename_seasons']
-        self.delete_files = config['delete_files']
+        self.show_delete_files = config['show_delete_files']
         self.debug = config['debug']
         self.other_suffix_list = config['other_suffix_list'].split(',')
 
@@ -155,12 +155,14 @@ class LocalMediaRename:
             # 输出提醒消息
             print("以下视频文件将被重命名: ")
             for video in video_rename_list:
-                print("{} -> {}".format(video['original_name'],
-                                        video['target_name']))
-            print("以下字幕文件将被重命名: ")
-            for subtitle in subtitle_rename_list:
-                print("{} -> {}".format(subtitle['original_name'],
-                                        subtitle['target_name']))
+                print("{} -> {}".format(video['original_name'], video['target_name']))
+            
+            # 只有当存在字幕文件时才输出提示
+            if subtitle_rename_list:
+                print("以下字幕文件将被重命名: ")
+                for subtitle in subtitle_rename_list:
+                    print("{} -> {}".format(subtitle['original_name'], subtitle['target_name']))
+
 
             while True:
                 signal = input("你确定要重命名吗？[Enter] 确认，[n] 取消\t")
@@ -263,7 +265,7 @@ class LocalMediaRename:
             result['result'] += (rename_result['result'])
         return result
 
-    def rename_season_folders(self, folder_path: str, rename_seasons=False, delete_files=False):
+    def rename_season_folders(self, folder_path: str, rename_seasons=False, show_delete_files=False):
         for folder_name in os.listdir(folder_path):
             sub_folder_path = os.path.join(folder_path, folder_name)
             if os.path.isdir(sub_folder_path):
@@ -286,8 +288,8 @@ class LocalMediaRename:
                         # 重命名文件夹
                         os.rename(folder_path, os.path.join(sub_folder_path, new_folder_name))
 
-                # 如果delete_files为True，则删除指定格式的文件
-                if delete_files:
+                # 如果show_delete_files为True，则删除指定格式的文件
+                if show_delete_files:
                     file_list = os.listdir(sub_folder_path)
                     for file_name in file_list:
                         if file_name.endswith(tuple(self.other_suffix_list)):
@@ -302,4 +304,4 @@ if __name__ == '__main__':
     root_folder_path = input("请输入你的目录的路径：")
     # 使用LocalMediaRename对象来重命名文件
     renamer.rename_files(root_folder_path)
-    renamer.rename_season_folders(root_folder_path, rename_seasons=renamer.rename_seasons, delete_files=renamer.delete_files)
+    renamer.rename_season_folders(root_folder_path, rename_seasons=renamer.rename_seasons, show_delete_files=renamer.show_delete_files)

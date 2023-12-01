@@ -130,6 +130,8 @@ class MovieRenamer:
                     file_path = os.path.join(root, media_file)
                     if file_path in media_files:
                         new_name_base = os.path.splitext(media_files[file_path])[0]
+                    else:
+                        continue  # 如果媒体文件被跳过，则跳过当前循环
                     # 获取字幕文件的扩展名
                     subtitle_ext = os.path.splitext(best_match)[1]
                     # 将新名称的基础部分与字幕文件的扩展名结合，形成新的字幕文件名
@@ -146,6 +148,7 @@ class MovieRenamer:
                     # 在字幕文件字典中添加一个条目
                     subtitle_files[os.path.join(root, subtitle_file)] = new_name
         return subtitle_files
+
 
 
     def collect_files_info(self, parent_folder_path):
@@ -484,6 +487,35 @@ class MovieRenamer:
         old_name = os.path.basename(old_name)
         new_name = os.path.basename(new_name)
         return f"{index}. 改前名: {Fore.BLUE}{old_name}{Style.RESET_ALL}\n{index}. 改后名: {Fore.GREEN}{new_name}{Style.RESET_ALL}"
+
+
+    def process_single_folder(self, folder_path):
+        # 检查路径是否存在并且是一个文件夹
+        if not os.path.isdir(folder_path):
+            print(f"路径 {folder_path} 不存在或者不是一个文件夹。")
+            return
+
+        # 提取文件夹名称
+        folder_name = os.path.basename(folder_path)
+
+        # 提取文件夹信息
+        title, year = self.extract_folder_info(folder_name)
+
+        # 根据库类型搜索匹配的内容
+        matched_content = None
+        if self.library_type_index == 1:
+            print(f"正在搜索电影中：{title} ({year})")
+            matched_content = self.tmdb_api.search_movie(title, year)
+        elif self.library_type_index == 2:
+            print(f"正在搜索剧集中：{title} ({year})")
+            matched_content = self.tmdb_api.search_tv(title, year)
+
+        # 如果找到匹配的内容，重命名文件夹
+        if matched_content:
+            print(f"从库中获取内容: {matched_content['title']} ({matched_content['year']}) {{tmdbid-{matched_content['tmdbid']}}}")
+            tmdb_id = matched_content['tmdbid']
+            new_folder_name = self.folder_title_format(matched_content['title'], matched_content['year'], tmdb_id)
+            self.process_folder(folder_path, new_folder_name, matched_content)
 
 
 if __name__ == "__main__":
