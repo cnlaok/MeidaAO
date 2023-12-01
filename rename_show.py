@@ -18,12 +18,13 @@ class LocalMediaRename:
         self.tmdb = TMDBApi(config['TMDB_API_KEY'])
         self.tmdb_language = self.select_language(config)
         self.tv_name_format = config['tv_name_format']
-        self.video_suffix_list = config['video_suffix_list']
-        self.subtitle_suffix_list = config['subtitle_suffix_list']
+        self.video_suffix_list = config['video_suffix_list'].split(',')
+        self.subtitle_suffix_list = config['subtitle_suffix_list'].split(',')
+        self.other_suffix_list = config['other_suffix_list'].split(',')
         self.rename_seasons = config['rename_seasons']
         self.show_delete_files = config['show_delete_files']
         self.debug = config['debug']
-        self.other_suffix_list = config['other_suffix_list'].split(',')
+
 
     def select_language(self, config):
         if config['ask_language_change']:
@@ -290,11 +291,14 @@ class LocalMediaRename:
 
                 # 如果show_delete_files为True，则删除指定格式的文件
                 if show_delete_files:
-                    file_list = os.listdir(sub_folder_path)
-                    for file_name in file_list:
-                        if file_name.endswith(tuple(self.other_suffix_list)):
-                            os.remove(os.path.join(sub_folder_path, file_name))
-
+                    for dirpath, dirnames, filenames in os.walk(sub_folder_path):
+                        for file_name in filenames:
+                            if file_name.endswith(tuple(self.other_suffix_list)):
+                                full_file_name = os.path.join(dirpath, file_name)
+                                try:
+                                    os.remove(full_file_name)
+                                except OSError as e:
+                                    print(f"Error: {e.filename} - {e.strerror}.")
 
 if __name__ == '__main__':
     # 创建一个LocalMediaRename对象

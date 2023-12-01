@@ -22,10 +22,10 @@ class MovieRenamer:
         self.config = self.config_manager.config
         server_info_and_key = self.config_manager.get_server_info_and_key()
         self.plex_api = PlexApi(server_info_and_key['plex_url'], server_info_and_key['plex_token'])
-        self.video_suffix_list = self.config['video_suffix_list']
-        self.subtitle_suffix_list = self.config['subtitle_suffix_list']
-        self.other_suffix_list = self.config['other_suffix_list']
-        self.movie_title_format = self.config['movie_title_format']
+        self.video_suffix_list = self.config['video_suffix_list'].split(',')
+        self.subtitle_suffix_list = self.config['subtitle_suffix_list'].split(',')
+        self.other_suffix_list = self.config['other_suffix_list'].split(',')
+        self.movie_title_format = self.config['movie_title_format'].split(',')
         self.move_files = self.config['move_files']
         self.movie_delete_files = self.config['movie_delete_files']
         

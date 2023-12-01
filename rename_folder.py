@@ -290,25 +290,21 @@ class MediaRenamer:
 
             self.folder_api.process_folder(folder_path, new_folder_name, None)
 
-# 主函数
+    def process(self):
+        if self.match_mode_index == 1:
+            self.match_mode_1()
+        elif self.match_mode_index == 2:
+            self.match_mode_2()
+        elif self.match_mode_index == 3:
+            self.match_mode_3()
+        elif self.match_mode_index == 4:
+            self.match_mode_4()
+            exit()
+
 def main() -> None:
-    # 创建MediaRenamer实例
     print(Fore.RED + '开始程序:注意输入的目录结构必须是【你的目录/剧集或电影文件夹/媒体文件或其他子目录】' + Style.RESET_ALL)
     media_renamer: MediaRenamer = MediaRenamer()
-    
+    media_renamer.process()
 
-    # 根据匹配模式执行相应的函数
-    if media_renamer.match_mode_index == 4:
-        media_renamer.match_mode_4()
-        exit()
-
-    if media_renamer.match_mode_index == 1:
-        media_renamer.match_mode_1()
-    elif media_renamer.match_mode_index == 2:
-        media_renamer.match_mode_2()
-    elif media_renamer.match_mode_index == 3:
-        media_renamer.match_mode_3()
-
-# 如果这个脚本是直接运行的，而不是被导入的，那么就运行主函数
 if __name__ == "__main__":
     main()
