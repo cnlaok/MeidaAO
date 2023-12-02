@@ -26,7 +26,7 @@ class MovieRenamer:
         self.subtitle_suffix_list = self.config['subtitle_suffix_list'].split(',')
         self.other_suffix_list = self.config['other_suffix_list'].split(',')
         self.movie_title_format = self.config['movie_title_format'].split(',')
-        self.move_files = self.config['move_files']
+        self.movie_move_files = self.config['move_files']
         self.movie_delete_files = self.config['movie_delete_files']
         
 
@@ -41,20 +41,25 @@ class MovieRenamer:
             return
         print(Fore.GREEN + f"预处理所有文件名: {parent_folder_path}" + Style.RESET_ALL)
         # 在处理文件信息之前，先预处理文件
-        if self.move_files or self.movie_delete_files:
-            self.move_and_delete_files(parent_folder_path)
+
+        if self.movie_delete_files:
+            self.delete_files(parent_folder_path)
+
+        if self.movie_move_files:
+            self.move_files(parent_folder_path)
 
         rename_dict = self.process_movie_files(parent_folder_path)
         if rename_dict is not None:
-            self.rename_files(rename_dict, self.movie_title_format)
-            print(Fore.RED + "重命名执行完毕" + Style.RESET_ALL)
+            self.rename_files(rename_dict)
+            print(Fore.RED + "媒体文件重命名执行完毕。" + Style.RESET_ALL)
 
-        subtitle_rename_dict = self.process_subtitle_files(parent_folder_path, rename_dict)
+
+        subtitle_rename_dict = self.process_subtitle_files(parent_folder_path)
         if subtitle_rename_dict is not None:
-            self.rename_files(subtitle_rename_dict, self.movie_title_format)
-            print(Fore.RED + "字幕文件重命名执行完毕" + Style.RESET_ALL)
+            self.rename_files(subtitle_rename_dict)
+            print(Fore.RED + "字幕文件重命名执行完毕。" + Style.RESET_ALL)
 
-    def move_and_delete_files(self, parent_folder_path):
+    def move_files(self, parent_folder_path):
         for root, dirs, files in os.walk(parent_folder_path, topdown=False):
             # 跳过父文件夹和直接子目录
             if root == parent_folder_path or os.path.dirname(root) == parent_folder_path:
@@ -62,7 +67,6 @@ class MovieRenamer:
 
             for filename in files:
                 file_path = os.path.join(root, filename)
-                extension = os.path.splitext(filename)[1][1:]
 
                 # 检查文件是否已经移动，如果已移动则跳过
                 if not os.path.exists(file_path):
@@ -75,14 +79,26 @@ class MovieRenamer:
                     if not os.path.exists(target_path):
                         shutil.move(file_path, target_path)
 
+    def delete_files(self, parent_folder_path):
+        for root, dirs, files in os.walk(parent_folder_path, topdown=False):
+            # 跳过父文件夹和直接子目录
+            if root == parent_folder_path:
+                continue
+
+            for filename in files:
+                file_path = os.path.join(root, filename)
+                extension = os.path.splitext(filename)[1][1:]
+
                 # 删除指定扩展名的文件
                 if self.movie_delete_files and extension in self.other_suffix_list:
-                    os.remove(file_path)
+                    if os.path.exists(file_path):
+                        os.remove(file_path)
 
             # 检查并删除空目录
             if not os.listdir(root):
                 os.rmdir(root)
         print(Fore.RED + "执行移动删除完成。" + Style.RESET_ALL)
+
 
     def process_movie_files(self, directory_path: str) -> Dict[str, str]:
         """
@@ -110,45 +126,59 @@ class MovieRenamer:
         return SequenceMatcher(None, a, b).ratio()
 
 
-    def process_subtitle_files(self, directory_path, media_files):
+    def process_subtitle_files(self, directory_path):
+        print(f"支持的字幕文件格式: {self.subtitle_suffix_list}")
         subtitle_files = {}
-        media_files_in_dir = [file for root, dirs, files in os.walk(directory_path) for file in files if file.endswith(tuple('.' + ext for ext in self.video_suffix_list))]
+        media_files = {}
+        media_file_counts = {}
+
         for root, dirs, files in os.walk(directory_path):
+            media_files_in_dir = [file for file in files if file.endswith(tuple('.' + ext for ext in self.video_suffix_list))]
             subtitles_in_dir = [file for file in files if file.endswith(tuple('.' + ext for ext in self.subtitle_suffix_list))]
+
+            # 将媒体文件的路径和名称添加到media_files字典中，并初始化每个媒体文件的计数器
             for media_file in media_files_in_dir:
+                media_files[os.path.join(root, media_file)] = media_file
+                media_file_counts[os.path.join(root, media_file)] = 0
+
+            for subtitle_file in subtitles_in_dir:
                 max_similarity = 0
                 best_match = None
-                media_name = os.path.splitext(media_file)[0]
-                for subtitle_file in subtitles_in_dir:
-                    subtitle_name = os.path.splitext(subtitle_file)[0]
-                    similarity = self.similar(media_name, subtitle_name)
-                    if similarity > max_similarity:
-                        max_similarity = similarity
-                        best_match = subtitle_file
-                if best_match is not None:
-                    # 获取媒体文件的新名称，但不包括扩展名
-                    file_path = os.path.join(root, media_file)
-                    if file_path in media_files:
-                        new_name_base = os.path.splitext(media_files[file_path])[0]
-                    else:
-                        continue  # 如果媒体文件被跳过，则跳过当前循环
-                    # 获取字幕文件的扩展名
-                    subtitle_ext = os.path.splitext(best_match)[1]
-                    # 将新名称的基础部分与字幕文件的扩展名结合，形成新的字幕文件名
-                    new_name = new_name_base + subtitle_ext
-                    # 在字幕文件字典中添加一个条目
-                    subtitle_files[os.path.join(root, best_match)] = new_name
-                    subtitles_in_dir.remove(best_match)
-                # 对于同一目录下的额外字幕文件，添加一个序号以区分它们
-                for i, subtitle_file in enumerate(subtitles_in_dir, 1):
-                    # 获取字幕文件的扩展名
-                    subtitle_ext = os.path.splitext(subtitle_file)[1]
-                    # 将新名称的基础部分、序号和字幕文件的扩展名结合，形成新的字幕文件名
-                    new_name = f"{new_name_base}_{i}{subtitle_ext}"
-                    # 在字幕文件字典中添加一个条目
-                    subtitle_files[os.path.join(root, subtitle_file)] = new_name
-        return subtitle_files
 
+                subtitle_name = os.path.splitext(subtitle_file)[0]
+
+                for media_file in media_files_in_dir:
+                    media_name = os.path.splitext(media_file)[0]
+                    similarity = self.similar(media_name, subtitle_name)
+
+                    # 只要相似度大于0，并且这个媒体文件的计数器值最小，就视为匹配
+                    if similarity > 0 and (best_match is None or media_file_counts[os.path.join(root, media_file)] < media_file_counts[os.path.join(root, best_match)]):
+                        max_similarity = similarity
+                        best_match = media_file
+
+                if best_match:  # 如果有媒体文件，则必定满足相似度
+                    file_path = os.path.join(root, best_match)
+                    new_name_base = os.path.splitext(media_files[file_path])[0]
+                    subtitle_ext = os.path.splitext(subtitle_file)[1]
+                    new_name = new_name_base + subtitle_ext
+
+                    identifier = 1
+                    while os.path.exists(os.path.join(root, new_name_base + f"_{identifier}" + subtitle_ext)) or new_name_base + f"_{identifier}" + subtitle_ext in subtitle_files.values():
+                        identifier += 1
+                    if identifier > 1:
+                        new_name = new_name_base + f"_{identifier}" + subtitle_ext
+
+                    # 增加这个媒体文件的计数器值
+                    media_file_counts[file_path] += 1
+                else:
+                    # 如果没有找到满足相似度的媒体文件，可以选择保留原始名称或采用其他默认处理方式
+                    new_name = subtitle_file
+                    print(f"没有找到满足相似度的媒体文件: {os.path.join(root, subtitle_file)}")
+
+                # 在新名称中包含完整的路径
+                subtitle_files[os.path.join(root, subtitle_file)] = os.path.join(root, new_name)
+
+        return subtitle_files
 
 
     def collect_files_info(self, parent_folder_path):
@@ -249,7 +279,7 @@ class MovieRenamer:
                     final_elements[key] = value.lower()
                 else:
                     # 其他元素全部转换为大写
-                    final_elements[key] = value.upper().replace(' ', '.')
+                    final_elements[key] = value.upper().replace(' ', '.').replace(':', '：').replace('-', '：')
 
         #print("提取的信息：", final_elements)
         return final_elements
@@ -269,7 +299,7 @@ class MovieRenamer:
         file_ext = file_ext[1:]  # 获取不包含点号的扩展名
         file_name_no_ext = file_name_no_ext.replace('.', ' ')
         file_name_no_ext = file_name_no_ext.upper()
-        self.elements_to_remove = self.config['elements_to_remove']
+        self.elements_to_remove = self.config['elements_to_remove'].split(',')
         for element in self.elements_to_remove:
             file_name_no_ext = re.sub(element, '', file_name_no_ext)
         file_name_no_ext = re.sub(r'\b(REMUX|BDREMUX|BD-REMUX)\b', 'REMUX', file_name_no_ext, flags=re.IGNORECASE)
@@ -309,7 +339,7 @@ class MovieRenamer:
             elements['chinese_title'] = chinese_title.group(0)[1:-1]
             file_name_no_ext = file_name_no_ext.replace(chinese_title.group(0), '')
         else:
-            chinese_title = re.search(r'[\u4e00-\u9fff0-9a-zA-Z½]+', file_name_no_ext)
+            chinese_title = re.search(r'[\u4e00-\u9fff]+[0-9a-zA-Z：，·]*', file_name_no_ext)
             if chinese_title:
                 if re.search(r'[\u4e00-\u9fff]', chinese_title.group(0)):
                     elements['chinese_title'] = chinese_title.group(0)
@@ -320,7 +350,7 @@ class MovieRenamer:
                 elements['chinese_title'] = None
         if elements['chinese_title'] is None and file_path and len(os.listdir(os.path.dirname(file_path))) < 8:
             parent_folder_name = os.path.basename(os.path.dirname(file_path))
-            chinese_title = re.search(r'[\u4e00-\u9fffA-Za-z0-9：，]+', parent_folder_name)
+            chinese_title = re.search(r'[\u4e00-\u9fff]+[0-9a-zA-Z：，·]*', parent_folder_name)
             if chinese_title:
                 elements['chinese_title'] = chinese_title.group(0)
                 #print(Fore.GREEN + f"提取的中文标题: {elements['chinese_title']}" + Style.RESET_ALL)
@@ -334,7 +364,7 @@ class MovieRenamer:
 
         if elements['chinese_title'] is None and elements['english_title'] is None:
             parent_folder_name = os.path.basename(os.path.dirname(file_path))
-            chinese_title = re.search(r'[\u4e00-\u9fff]+', parent_folder_name)
+            chinese_title = re.search(r'[\u4e00-\u9fff]+[0-9a-zA-Z：，·]*', parent_folder_name)
             english_title = re.search(r'[a-zA-Z0-9_]+', parent_folder_name)
             if chinese_title:
                 elements['chinese_title'] = chinese_title.group(0)
@@ -436,7 +466,7 @@ class MovieRenamer:
         return 'SDR'
 
 
-    def rename_files(self, rename_dict: Dict[str, str], template: list):
+    def rename_files(self, rename_dict: Dict[str, str]):
         """
         重命名文件。
 
@@ -466,8 +496,8 @@ class MovieRenamer:
                     print("输入的不是有效的数字，请重新输入。")
 
         for old_name, new_name in rename_dict.items():
-            if not os.path.exists(new_name):
-                print(Fore.GREEN + f"正在重命名：{os.path.basename(old_name)} -> {os.path.basename(new_name)}" + Style.RESET_ALL)
+            if not os.path.exists(new_name):     
+                print(self.format_file_info(index, old_name, new_name))
                 os.rename(old_name, new_name)
             else:
                 print(Fore.RED + f"跳过重命名：{os.path.basename(new_name)}" + Style.RESET_ALL)

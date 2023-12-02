@@ -15,15 +15,15 @@ class FolderAPI:
         # 从文件夹名称中提取信息
         folder_name = re.sub(r'\{tmdb-\d+\}', '', folder_name)
         folder_name = re.sub(r'4K', '', folder_name)
-        year = re.search(r'\((\d{4})\)', folder_name)
+        year = re.search(r'\((19[0-9]{2}|20[0-2][0-9]|2030)\)', folder_name)
         if year:
             year = year.group().strip('()')
         else:
-            year = re.search(r'(\d{4})', folder_name)
+            year = re.search(r'(19[0-9]{2}|20[0-2][0-9]|2030)', folder_name)
             if year:
                 year = year.group()
         folder_without_year = re.sub(str(year), '', folder_name) if year else folder_name
-        chinese_titles = re.findall(r'[\u4e00-\u9fff0-9a-zA-Z：，·]+', folder_without_year)
+        chinese_titles = re.findall(r'[\u4e00-\u9fff]+[0-9a-zA-Z：，·]*', folder_without_year)
         english_title = ' '.join(re.findall(r'[a-zA-Z\s]+(?![^\(]*\))', folder_without_year))
         if not chinese_titles and not english_title:
             title = ''.join(re.findall(r'(?<!\()\d+(?!\))', folder_without_year))
