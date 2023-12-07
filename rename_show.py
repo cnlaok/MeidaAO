@@ -6,7 +6,9 @@ import re
 import os
 import time
 import json
+import shutil
 import colorama
+from natsort import natsorted
 from colorama import Fore, Style
 from api import TMDBApi
 
@@ -18,13 +20,15 @@ class LocalMediaRename:
         self.tmdb = TMDBApi(config['TMDB_API_KEY'])
         self.tmdb_language = self.select_language(config)
         self.tv_name_format = config['tv_name_format']
-        self.video_suffix_list = config['video_suffix_list'].split(',')
+        self.video_suffix_list = [suffix.lower() for suffix in config['video_suffix_list'].split(',')]
+        self.video_suffix_list += [suffix.upper() for suffix in config['video_suffix_list'].split(',')]
         self.subtitle_suffix_list = config['subtitle_suffix_list'].split(',')
         self.other_suffix_list = config['other_suffix_list'].split(',')
         self.rename_seasons = config['rename_seasons']
         self.show_delete_files = config['show_delete_files']
+        self.auto_rename = config['auto_rename']
         self.debug = config['debug']
-
+        self.destination_folder = config['destination_folder']
 
     def select_language(self, config):
         if config['ask_language_change']:
@@ -49,31 +53,79 @@ class LocalMediaRename:
                 title = folder_name  # 假设整个文件夹名就是标题
                 if match:
                     title, year, tmdb_id = match.groups()
+                    print(Fore.RED + "-" * 120)
                     print(colorama.Fore.GREEN + f"正在处理的文件夹: {folder_name} 标题: {title}, 年份: {year}, TMDB ID: {tmdb_id}" + colorama.Fore.RESET)
-                # 检查是否存在季文件夹
+                    time.sleep(1)
                 season_folders = [name for name in os.listdir(sub_folder_path) if os.path.isdir(os.path.join(sub_folder_path, name)) and re.search(r'(S\d+|SEASON \d+|第\d+季)', name.upper())]
                 if season_folders:
-                    # 如果存在季文件夹，对每个季文件夹执行相同的操作
+                    all_skipped_episodes = []
                     for season_folder in season_folders:
                         season_folder_path = os.path.join(sub_folder_path, season_folder)
-                        print(f"正在处理的季文件夹: {season_folder}") 
+                        #print(f"正在处理的季文件夹: {season_folder}") 
                         if match:
-                            # 根据TMDB ID重命名文件
-                            self.tv_rename_id(tmdb_id, season_folder_path)
+                            skipped_episodes = self.tv_rename_id(tmdb_id, season_folder_path)
+                            all_skipped_episodes.extend(skipped_episodes)
                         else:
-                            # 如果没有TMDB ID，使用标题来重命名文件
-                            self.tv_rename_keyword(title, season_folder_path)
+                            skipped_episodes = self.tv_rename_keyword(title, season_folder_path)
+                            all_skipped_episodes.extend(skipped_episodes)
+
+                    if not all_skipped_episodes:
+                        new_folder_path = os.path.join(self.destination_folder, folder_name)
+                        suffix = 2
+                        while os.path.exists(new_folder_path):
+                            new_folder_name = f'{folder_name} 版本-{suffix}'
+                            new_folder_path = os.path.join(self.destination_folder, new_folder_name)
+                            suffix += 1
+
+                        try:
+                            shutil.move(sub_folder_path, new_folder_path)
+                            print(f"成功移动文件夹: {sub_folder_path} -> {new_folder_path}")
+                        except Exception as e:
+                            print(f"移动文件夹时发生错误: {e}")
+
+                        if self.debug:
+                            print(colorama.Fore.GREEN + "正在移动: {} -> {}".format(sub_folder_path, new_folder_path) + colorama.Fore.RESET)
                 else:
-                    # 如果不存在季文件夹，假设剧集只有一季，并对子文件夹中的文件执行重命名操作
                     if match:
-                        # 根据TMDB ID重命名文件
-                        self.tv_rename_id(tmdb_id, sub_folder_path)
+                        skipped_episodes = self.tv_rename_id(tmdb_id, sub_folder_path)
+                        if not skipped_episodes:
+                            new_folder_path = os.path.join(self.destination_folder, folder_name)
+                            suffix = 2
+                            while os.path.exists(new_folder_path):
+                                new_folder_name = f'{folder_name} 版本-{suffix}'
+                                new_folder_path = os.path.join(self.destination_folder, new_folder_name)
+                                suffix += 1
+
+                            try:
+                                shutil.move(sub_folder_path, new_folder_path)
+                                print(f"成功移动文件夹: {sub_folder_path} -> {new_folder_path}")
+                            except Exception as e:
+                                print(f"移动文件夹时发生错误: {e}")
+
+                            if self.debug:
+                                print(colorama.Fore.GREEN + "正在移动: {} -> {}".format(sub_folder_path, new_folder_path) + colorama.Fore.RESET)
                     else:
-                        # 如果没有TMDB ID，使用标题来重命名文件
-                        self.tv_rename_keyword(title, sub_folder_path)
+                        skipped_episodes = self.tv_rename_keyword(title, sub_folder_path)
+                        if not skipped_episodes:
+                            new_folder_path = os.path.join(self.destination_folder, folder_name)
+                            suffix = 2
+                            while os.path.exists(new_folder_path):
+                                new_folder_name = f'{folder_name} 版本-{suffix}'
+                                new_folder_path = os.path.join(self.destination_folder, new_folder_name)
+                                suffix += 1
+
+                            try:
+                                shutil.move(sub_folder_path, new_folder_path)
+                                #print(f"成功移动文件夹: {sub_folder_path} -> {new_folder_path}")
+                            except Exception as e:
+                                print(f"移动文件夹时发生错误: {e}")
+
+                            if self.debug:
+                                print(colorama.Fore.GREEN + "正在移动: {} -> {}".format(sub_folder_path, new_folder_path) + colorama.Fore.RESET)
 
 
-    def tv_rename_id(self, tv_id: str, folder_path: str, first_number: int = 1) -> dict:
+    def tv_rename_id(self, tv_id: str, folder_path: str, first_number: int = 1, auto_rename=False):
+        skipped_episodes = []  # 在函数开始处初始化 skipped_episodes
         folder_path = os.path.normpath(folder_path) + os.sep
         notice_msg = colorama.Fore.GREEN + '[提示!]' + colorama.Fore.RESET
 
@@ -108,64 +160,71 @@ class LocalMediaRename:
                     season_number = int(match.group(1))
                     break
             if not match:
-                # 如果提取不到季数，请求用户手动输入
-                season_number = input("无法从文件夹名中提取季数，请手动输入：")
-                season_number = int(season_number)  # 将输入的字符串转换为整数
+                season_number = 1
+
 
         # 获取剧集对应季每集信息
         tv_season_info = self.tmdb.tv_season_info(tv_id, season_number, language=self.tmdb_language, silent=self.debug)
         result['result'].append(tv_season_info)
 
         # 若获取失败则停止， 并返回结果
-        if tv_season_info['request_code'] != 200:
+        if tv_info_result['request_code'] != 200:
             failure_msg = colorama.Fore.RED + '\n[TvInfo●失败]' + colorama.Fore.RESET
             print(f"{failure_msg} 剧集id: {tv_id}\t{tv_info_result['name']} 第 {season_number} 季\n{tv_season_info['status_message']}")
             return result
 
         # 保存剧集标题
-        episodes = list(
-            map(
-                lambda x: self.tv_name_format.format(
-                    name=tv_info_result['name'], season=tv_season_info['season_number'], episode=x[
-                        'episode_number'], title=x['name']),
-                tv_season_info['episodes']))
-        episodes = episodes[first_number - 1:]
+        if 'episodes' in tv_season_info:
+            episodes = list(
+                map(
+                    lambda x: self.tv_name_format.format(
+                        name=tv_info_result['name'], season=tv_season_info['season_number'], episode=x[
+                            'episode_number'], title=x['name']),
+                    tv_season_info['episodes']))
+            episodes = episodes[first_number - 1:]
 
-        # 创建包含源文件名以及目标文件名列表
-        file_list = os.listdir(folder_path)
-        video_list = list(
-            filter(lambda x: x.split(".")[-1] in self.video_suffix_list, file_list))
+            # 创建包含源文件名以及目标文件名列表
+            file_list = os.listdir(folder_path)
+            sorted_file_list = natsorted(file_list)
 
-        subtitle_list = list(
-            filter(lambda x: x.split(".")[-1] in self.subtitle_suffix_list, file_list))
-        video_rename_list = list(
-            map(
-                lambda x, y: dict(original_name=x,
-                                target_name=y + '.' + x.split(".")[-1]),
-                video_list, episodes))
-        subtitle_rename_list = list(
-            map(
-                lambda x, y: dict(original_name=x,
-                                target_name=y + '.' + x.split(".")[-1]),
-                subtitle_list, episodes))
+            video_list = list(
+                filter(lambda x: x.split(".")[-1] in self.video_suffix_list, sorted_file_list))
+
+            subtitle_list = list(
+                filter(lambda x: x.split(".")[-1] in self.subtitle_suffix_list, sorted_file_list))
+            video_rename_list = list(
+                map(
+                    lambda x, y: dict(original_name=x,
+                                    target_name=y + '.' + x.split(".")[-1]),
+                    video_list, episodes))
+            subtitle_rename_list = list(
+                map(
+                    lambda x, y: dict(original_name=x,
+                                    target_name=y + '.' + x.split(".")[-1]),
+                    subtitle_list, episodes))
+
+        else:
+            print(colorama.Fore.RED + f"警告：'episodes' 键不存在于 tv_season_info 字典中。跳过当前操作。" + colorama.Fore.RESET)
+            return result  # 返回结果，跳过当前操作
 
         # 检查TMDB的集数是否与媒体文件数量相同
         if len(tv_season_info['episodes']) == len(video_list):
             print(colorama.Fore.GREEN + "TMDB的集数与媒体文件数量相同，以下是将要重命名的文件列表：" + colorama.Fore.RESET)
 
             # 输出提醒消息
-            print("以下视频文件将被重命名: ")
+            print("以下媒体文件将被重命名: ")
             for video in video_rename_list:
-                print("{} -> {}".format(video['original_name'], video['target_name']))
+                continue
+                #print("{} -> {}".format(video['original_name'], video['target_name']))
             
             # 只有当存在字幕文件时才输出提示
             if subtitle_rename_list:
-                print("以下字幕文件将被重命名: ")
+                #print("以下字幕文件将被重命名: ")
                 for subtitle in subtitle_rename_list:
-                    print("{} -> {}".format(subtitle['original_name'], subtitle['target_name']))
+                    continue
+                    #print("{} -> {}".format(subtitle['original_name'], subtitle['target_name']))
 
-
-            while True:
+            while not self.auto_rename:
                 signal = input("你确定要重命名吗？[Enter] 确认，[n] 取消\t")
                 if signal.lower() == '':
                     break
@@ -184,15 +243,19 @@ class LocalMediaRename:
                 os.rename(folder_path + file['original_name'], folder_path + file['target_name'])
                 if self.debug:
                     print(colorama.Fore.GREEN + "正在重命名: {} -> {}".format(file['original_name'], file['target_name']) + colorama.Fore.RESET)
-                time.sleep(1)
+                
 
-            print(colorama.Fore.GREEN + "文件重命名操作完成" + colorama.Fore.RESET)
+            print(colorama.Fore.GREEN + f"文件重命名操作完成" + colorama.Fore.RESET)
+
         else:
             tmdb_episodes = set(range(1, len(tv_season_info['episodes']) + 1))
             existing_episodes = []
+            skipped_episodes = []  # 新增：用于记录被跳过的剧集
             for file in video_rename_list:
+                # 尝试匹配多种集数格式
                 match = re.search(r'E(\d+)', file['original_name'])
                 if match:
+                    # 从匹配的结果中提取集数
                     existing_episodes.append(int(match.group(1)))
                 else:
                     match = re.search(r'(\d{2}-\d{2}|\d{4})', file['original_name'])
@@ -208,7 +271,17 @@ class LocalMediaRename:
 
             missing_episodes = tmdb_episodes - set(existing_episodes)
 
-            print(colorama.Fore.RED + f"警告：TMDB的集数与媒体文件数量不同，缺失的集数为：{len(missing_episodes)}，缺失的集为：{sorted(list(missing_episodes))}，已默认选择不重命名。" + colorama.Fore.RESET)
+            print(colorama.Fore.RED + f"警告：文件数为：{len(video_list)}，TMDB的集数为：{len(tv_season_info['episodes'])}，缺失的集数为：{len(missing_episodes)}，缺失的集为：{sorted(list(missing_episodes))}。" + colorama.Fore.RESET)
+
+            for i in range(len(tv_season_info['episodes'])):
+                if (i + 1) in missing_episodes:
+                    skipped_episodes.append(i + 1)  # 新增：记录被跳过的剧集
+                    continue
+
+            print(colorama.Fore.GREEN + "剧集因缺集被跳过重命名！" + colorama.Fore.RESET)
+            skipped_episodes = ['default_value']
+            return skipped_episodes
+        return skipped_episodes  # 返回被跳过的剧集
 
     def tv_rename_keyword(self,
                           keyword: str,
@@ -222,7 +295,7 @@ class LocalMediaRename:
         :param first_number: 从指定集数开始命名, 如first_name=5, 则从第5集开始按顺序重命名
         :return: 重命名请求结果
         """
-
+        all_skipped_episodes = []
         notice_msg = colorama.Fore.GREEN + '[提示!]' + colorama.Fore.RESET
 
         # 创建返回数据
@@ -262,43 +335,56 @@ class LocalMediaRename:
 
         # 根据获取到的id进行重命名
         for season_number in range(1, len(search_result['results']) + 1):
-            rename_result = self.tv_rename_id(search_result['results'][int(tv_number)]['id'], folder_path, first_number)
-            result['result'] += (rename_result['result'])
+            skipped_episodes = self.tv_rename_id(search_result['results'][int(tv_number)]['id'], folder_path, first_number)
         return result
 
-    def rename_season_folders(self, folder_path: str, rename_seasons=False, show_delete_files=False):
+    def rename_season_folders(self, folder_path: str, rename_seasons: bool=False):
+        # 首先确保传入的是一个目录
+        if not os.path.isdir(folder_path):
+            return
+
         for folder_name in os.listdir(folder_path):
             sub_folder_path = os.path.join(folder_path, folder_name)
+            # 只处理目录
             if os.path.isdir(sub_folder_path):
-                # 如果rename_seasons为True，则重命名季度文件夹
-                if rename_seasons:
-                    self.rename_season_folders(sub_folder_path)
-
                 # 检查是否存在季文件夹
-                season_folders = [name for name in os.listdir(sub_folder_path) if os.path.isdir(os.path.join(sub_folder_path, name)) and re.search(r'(S\d+|SEASON \d+|第\d+季)', name.upper())]
+                season_match = re.search(r'\bS(\d+)\b|\bS (\d+)\b|\bSEASON(\d+)\b|\bSEASON (\d+)\b|\b第(\d+)季\b|S\d+', folder_name.upper())
+                if season_match:
+                    season_number = re.search(r'\d+', season_match.group()).group().strip()
+                    season_number = str(int(season_number))
+                    new_folder_name = f'Season {season_number}'
+                    new_folder_path = os.path.join(folder_path, new_folder_name)
+                    if folder_name == new_folder_name:
+                        continue
+                    # 检查新的文件夹名是否已经存在，如果存在，添加一个后缀
+                    suffix = 2
+                    while os.path.exists(new_folder_path):
+                        new_folder_name = f'Season {season_number} 版本-{suffix}'
+                        new_folder_path = os.path.join(folder_path, new_folder_name)
+                        suffix += 1
 
-                # 遍历所有季文件夹
-                for folder in season_folders:
-                    folder_path = os.path.join(sub_folder_path, folder)
-                    if os.path.isdir(folder_path):
-                        print(f"正在处理的季文件夹: {folder}")
-                        # 提取季数
-                        season_number = re.search(r'\d+', folder).group()
-                        # 创建新的文件夹名称
-                        new_folder_name = f'Season {season_number}'
-                        # 重命名文件夹
-                        os.rename(folder_path, os.path.join(sub_folder_path, new_folder_name))
+                    print(f"季文件夹: {folder_name}  ->  {new_folder_name}")
+                    os.rename(sub_folder_path, new_folder_path)
 
-                # 如果show_delete_files为True，则删除指定格式的文件
-                if show_delete_files:
-                    for dirpath, dirnames, filenames in os.walk(sub_folder_path):
-                        for file_name in filenames:
-                            if file_name.endswith(tuple(self.other_suffix_list)):
-                                full_file_name = os.path.join(dirpath, file_name)
-                                try:
-                                    os.remove(full_file_name)
-                                except OSError as e:
-                                    print(f"Error: {e.filename} - {e.strerror}.")
+                # 递归处理子文件夹
+                self.rename_season_folders(sub_folder_path)
+
+
+
+
+
+
+
+    def delete_files(self, folder_path: str, show_delete_files=False):
+        for dirpath, dirnames, filenames in os.walk(folder_path):
+            for file_name in filenames:
+                if file_name.endswith(tuple(self.other_suffix_list)):
+                    full_file_name = os.path.join(dirpath, file_name)
+                    try:
+                        os.remove(full_file_name)
+                    except OSError as e:
+                        print(f"Error: {e.filename} - {e.strerror}.")
+
 
 if __name__ == '__main__':
     # 创建一个LocalMediaRename对象
@@ -306,6 +392,11 @@ if __name__ == '__main__':
     # 让用户输入根目录
     print(Fore.RED + '开始程序:注意输入的目录结构必须是【你的目录/剧集或电影文件夹/媒体文件或其他子目录】' + Style.RESET_ALL)
     root_folder_path = input("请输入你的目录的路径：")
+
+    # 重命名季度文件夹
+    renamer.rename_season_folders(root_folder_path, rename_seasons=renamer.rename_seasons)
+
+    # 删除指定格式的文件
+    renamer.delete_files(root_folder_path, show_delete_files=renamer.show_delete_files)
     # 使用LocalMediaRename对象来重命名文件
     renamer.rename_files(root_folder_path)
-    renamer.rename_season_folders(root_folder_path, rename_seasons=renamer.rename_seasons, show_delete_files=renamer.show_delete_files)

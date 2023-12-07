@@ -245,9 +245,15 @@ class TMDBApi:
             print("{:<15}{:<10}{:<10}{}".format(result['first_air_date'], str(i + 1), result['id'], result['name']))
             if year and result['first_air_date'][:4] != year:
                 continue
-            return return_data
+            # 创建一个新的字典，只包含匹配的结果
+            matched_result = {
+                'results': [result],
+                'request_code': return_data['request_code']
+            }
+            return matched_result
 
         return None
+
 
     def tv_info(self, tv_id: str, language: str = 'zh-CN', silent: bool = False) -> dict:
         """
@@ -276,7 +282,6 @@ class TMDBApi:
         name = return_data['name']
         dir_name = f"{name} ({first_air_year})"
         print(f"{success_msg} {dir_name}")
-
         return return_data
 
     def tv_season_info(self,
@@ -293,7 +298,7 @@ class TMDBApi:
         post_params = dict(api_key=self.key, language=language)
         response = self.send_request(post_url, post_params)
         if response is None:
-            return None
+            return {}
 
         return_data = response.json()
         return_data['request_code'] = response.status_code

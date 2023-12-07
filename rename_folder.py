@@ -33,7 +33,7 @@ class MediaRenamer:
         # 根据库的类型确定目标文件夹
         user_input = input("你确定要移动吗？[Enter] 确认，[n] 取消\t").lower()
         if self.match_mode_index in [1, 2] and (not user_input or user_input == 'y'):
-            self.target_folder = self.move_folder(self.library_type_index)
+            self.target_folder = self.move1_folder(self.library_type_index)
             # 在这里添加移动文件的代码
         else:
             self.target_folder = self.parent_folder_path
@@ -88,21 +88,10 @@ class MediaRenamer:
 
         return match_mode_index, library_type_index, naming_rule_index, parent_folder_path
 
-
     # 根据库的类型确定目标文件夹
-    def move_folder(self, library_type_index: int) -> str:
-        if library_type_index is not None:
-            target_folder = self.config['target_folders'][library_type_index]
-        else:
-            target_folder = self.parent_folder_path
-        return target_folder
-
-
-
-    # 根据库的类型确定目标文件夹
-    def move_folder(self, library_type_index: int):
+    def move1_folder(self, library_type_index: int):
         if library_type_index == 1:
-            target_folder = self.config['movies_folder']
+            target_folder = self.config['MOVIES_FOLDER']
         else:
             print(Fore.GREEN + "请选择要移动到的文件夹：" + Style.RESET_ALL)
             print("1. 剧集")
@@ -115,17 +104,16 @@ class MediaRenamer:
             print("8. 综艺")
             folder_index = int(input("请输入你选择的文件夹编号（默认为1）:") or "1")
             target_folder = {
-                1: self.config['shows_folder'],
-                2: self.config['anime_folder'],
-                3: self.config['chinese_drama_folder'],
-                4: self.config['documentary_folder'],
-                5: self.config['american_drama_folder'],
-                6: self.config['japanese_korean_drama_folder'],
-                7: self.config['sports_folder'],
-                8: self.config['variety_show_folder']
-            }.get(folder_index, self.config['shows_folder'])
+                1: self.config['SHOWS_FOLDER'],
+                2: self.config['ANIME_FOLDER'],
+                3: self.config['CHINESE_DRAMA_FOLDER'],
+                4: self.config['DOCUMENTARY_FOLDER'],
+                5: self.config['AMERICAN_DRAMA_FOLDER'],
+                6: self.config['JAPANESE_KOREAN_DRAMA_FOLDER'],
+                7: self.config['SPORTS_FOLDER'],
+                8: self.config['VARIETY_SHOW_FOLDER']
+            }.get(folder_index, self.config['SHOWS_FOLDER'])
         return target_folder
-
   
     def write_to_file(self):
         if self.append_data and self.matched_contents is not None:
@@ -191,22 +179,25 @@ class MediaRenamer:
                     content_to_append = [matched_content['title'], matched_content['year'], matched_content['tmdbid'], str(self.library_type_index)]
                 else:
                     # 处理模式2的情况
-                    first_matched_content = matched_content['results'][0]
-                    content_title = first_matched_content['title'] if self.library_type_index == 1 else first_matched_content['name']
-                    content_year = first_matched_content['release_date'][:4] if self.library_type_index == 1 else first_matched_content['first_air_date'][:4]
-                    tmdb_id = first_matched_content['id']
-                    print(Fore.BLUE + f"从库中获取内容: {content_title} ({content_year}) {{tmdbid-{tmdb_id}}}" + Style.RESET_ALL)
-                    new_folder_name = self.folder_title_format(content_title, content_year, tmdb_id)
-                    new_folder_name = self.folder_api.clean_folder_name(new_folder_name)
-                    content_to_append = [content_title, content_year, str(tmdb_id), str(self.library_type_index)]
+                    if matched_content['results']:  # 检查matched_content['results']是否为空
+                        first_matched_content = matched_content['results'][0]
+                        content_title = first_matched_content['title'] if self.library_type_index == 1 else first_matched_content['name']
+                        content_year = first_matched_content['release_date'][:4] if self.library_type_index == 1 else first_matched_content['first_air_date'][:4]
+                        tmdb_id = first_matched_content['id']
+                        print(Fore.BLUE + f"从库中获取内容: {content_title} ({content_year}) {{tmdbid-{tmdb_id}}}" + Style.RESET_ALL)
+                        new_folder_name = self.folder_title_format(content_title, content_year, tmdb_id)
+                        new_folder_name = self.folder_api.clean_folder_name(new_folder_name)
+                        content_to_append = [content_title, content_year, str(tmdb_id), str(self.library_type_index)]
+                        # 如果 append_data 为 true，则将匹配的内容添加到 matched_contents 列表中
+                        if self.append_data:
+                            self.matched_contents.append(content_to_append)
+
+                        self.move_folder(folder_path, new_folder_name)  # 移动文件夹的代码放入if matched_content['results']:的代码块中
+
             except KeyError:
                 print(Fore.RED + "无法从匹配的内容中获取年份。跳过此文件夹。" + Style.RESET_ALL)
                 return  # 跳过此文件夹并继续处理下一个文件夹
-            # 如果 append_data 为 true，则将匹配的内容添加到 matched_contents 列表中
-            if self.append_data:
-                self.matched_contents.append(content_to_append)
 
-            self.move_folder(folder_path, new_folder_name)
             print(Fore.BLUE + "-" * 120)
 
 
@@ -253,6 +244,8 @@ class MediaRenamer:
             folder_path = os.path.join(self.parent_folder_path, folder_name)
             self.process_single_folder(folder_path, mode=2)
         self.write_to_file()
+
+
     # 匹配模式3
     def match_mode_3(self):
         for folder_name in os.listdir(self.parent_folder_path):

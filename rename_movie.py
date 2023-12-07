@@ -28,7 +28,8 @@ class MovieRenamer:
         self.movie_title_format = self.config['movie_title_format'].split(',')
         self.movie_move_files = self.config['move_files']
         self.movie_delete_files = self.config['movie_delete_files']
-        
+        self.process_media = self.config['process_media']
+        self.process_subtitle = self.config['process_subtitle']
 
     def main(self) -> None:
         """
@@ -48,16 +49,17 @@ class MovieRenamer:
         if self.movie_move_files:
             self.move_files(parent_folder_path)
 
-        rename_dict = self.process_movie_files(parent_folder_path)
-        if rename_dict is not None:
-            self.rename_files(rename_dict)
-            print(Fore.RED + "媒体文件重命名执行完毕。" + Style.RESET_ALL)
+        if self.process_media:
+            rename_dict = self.process_movie_files(parent_folder_path)
+            if rename_dict is not None:
+                self.rename_files(rename_dict)
+                print(Fore.RED + "媒体文件重命名执行完毕。" + Style.RESET_ALL)
 
-
-        subtitle_rename_dict = self.process_subtitle_files(parent_folder_path)
-        if subtitle_rename_dict is not None:
-            self.rename_files(subtitle_rename_dict)
-            print(Fore.RED + "字幕文件重命名执行完毕。" + Style.RESET_ALL)
+        if self.process_subtitle:
+            subtitle_rename_dict = self.process_subtitle_files(parent_folder_path)
+            if subtitle_rename_dict is not None:
+                self.rename_files(subtitle_rename_dict)
+                print(Fore.RED + "字幕文件重命名执行完毕。" + Style.RESET_ALL)
 
     def move_files(self, parent_folder_path):
         for root, dirs, files in os.walk(parent_folder_path, topdown=False):
@@ -273,13 +275,15 @@ class MovieRenamer:
             if isinstance(value, str):
                 if key == 'english_title':
                     # 英文标题转换为首字母大写的形式
-                    final_elements[key] = value.title().replace(' ', '.')
+                    final_elements[key] = value.title().replace(' ', '.').replace('-', '：')
+                elif key == 'chinese_title':
+                    final_elements[key] = value.title().replace('-', '：').replace(':', '：')          
                 elif key == 'bit_depth':
                     # 保持 bit_depth 的值为小写
                     final_elements[key] = value.lower()
                 else:
                     # 其他元素全部转换为大写
-                    final_elements[key] = value.upper().replace(' ', '.').replace(':', '：').replace('-', '：')
+                    final_elements[key] = value.upper().replace(' ', '.')
 
         #print("提取的信息：", final_elements)
         return final_elements
@@ -339,7 +343,7 @@ class MovieRenamer:
             elements['chinese_title'] = chinese_title.group(0)[1:-1]
             file_name_no_ext = file_name_no_ext.replace(chinese_title.group(0), '')
         else:
-            chinese_title = re.search(r'[\u4e00-\u9fff]+[0-9a-zA-Z：，·]*', file_name_no_ext)
+            chinese_title = re.search(r'[\u4e00-\u9fff0-9a-zA-Z：，·-]+', file_name_no_ext)
             if chinese_title:
                 if re.search(r'[\u4e00-\u9fff]', chinese_title.group(0)):
                     elements['chinese_title'] = chinese_title.group(0)
@@ -350,7 +354,7 @@ class MovieRenamer:
                 elements['chinese_title'] = None
         if elements['chinese_title'] is None and file_path and len(os.listdir(os.path.dirname(file_path))) < 8:
             parent_folder_name = os.path.basename(os.path.dirname(file_path))
-            chinese_title = re.search(r'[\u4e00-\u9fff]+[0-9a-zA-Z：，·]*', parent_folder_name)
+            chinese_title = re.search(r'[\u4e00-\u9fff0-9a-zA-Z：，·-]*', parent_folder_name)
             if chinese_title:
                 elements['chinese_title'] = chinese_title.group(0)
                 #print(Fore.GREEN + f"提取的中文标题: {elements['chinese_title']}" + Style.RESET_ALL)
@@ -362,20 +366,19 @@ class MovieRenamer:
         else:
             elements['english_title'] = None
 
-        if elements['chinese_title'] is None and elements['english_title'] is None:
+        if elements['chinese_title'] is None:
             parent_folder_name = os.path.basename(os.path.dirname(file_path))
-            chinese_title = re.search(r'[\u4e00-\u9fff]+[0-9a-zA-Z：，·]*', parent_folder_name)
-            english_title = re.search(r'[a-zA-Z0-9_]+', parent_folder_name)
+            chinese_title = re.search(r'[\u4e00-\u9fff0-9a-zA-Z：，·-]*', parent_folder_name)
             if chinese_title:
                 elements['chinese_title'] = chinese_title.group(0)
-            if english_title:
-                elements['english_title'] = english_title.group(0)
 
         return elements
 
     def search_movie(self, file_path: str, chinese_title: str = None, english_title: str = None, year: str = None) -> str:
+        parent_folder_name = os.path.basename(os.path.dirname(file_path))
         file_name = os.path.basename(file_path)
-        print(Fore.GREEN + "PLEX正在提取元素:" + Style.RESET_ALL, file_name)
+        print(Fore.GREEN + "PLEX正在提取元素:" + Style.RESET_ALL, os.path.join(parent_folder_name, file_name))
+
 
         if chinese_title == english_title:
             english_title = None
