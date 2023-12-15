@@ -270,8 +270,9 @@ class LocalMediaRename:
                 existing_episodes = set(existing_episodes)
 
             missing_episodes = tmdb_episodes - set(existing_episodes)
-
-            print(colorama.Fore.RED + f"警告：文件数为：{len(video_list)}，TMDB的集数为：{len(tv_season_info['episodes'])}，缺失的集数为：{len(missing_episodes)}，缺失的集为：{sorted(list(missing_episodes))}。" + colorama.Fore.RESET)
+            print(existing_episodes)
+            print(missing_episodes)
+            print(colorama.Fore.RED + f"警告：文件数为：{len(video_list)}，TMDB的集数为：{len(tv_season_info['episodes'])}，缺失的集数为：{len(missing_episodes)}，缺失的集为：{sorted(list(missing_episodes))}。" + colorama.Fore.RESET)           
 
             for i in range(len(tv_season_info['episodes'])):
                 if (i + 1) in missing_episodes:
@@ -368,6 +369,7 @@ class LocalMediaRename:
 
                 # 递归处理子文件夹
                 self.rename_season_folders(sub_folder_path)
+
 
 
 

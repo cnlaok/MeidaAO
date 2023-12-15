@@ -13,7 +13,7 @@ class FolderAPI:
     # 从文件夹名称中提取信息
     def extract_folder_info(self, folder_name: str) -> Tuple[str, str]:
         # 从文件夹名称中提取信息
-        folder_name = re.sub(r'\{tmdb-\d+\}', '', folder_name)
+        folder_name = re.sub(r'剧场版', '', folder_name)
         folder_name = re.sub(r'4K', '', folder_name)
         year = re.search(r'\((19[0-9]{2}|20[0-2][0-9]|2030)\)', folder_name)
         if year:

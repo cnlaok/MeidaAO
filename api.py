@@ -391,3 +391,56 @@ class TMDBApi:
         return return_data
 
 
+    def search_movie_info(self, title: str, year: str = None, language: str = 'zh-CN', silent: bool = False) -> dict:
+        """
+        在TMDB上搜索指定标题和年份的电影。
+        如果标题为空，抛出ValueError。
+        如果年份不是数字，抛出ValueError。
+        如果找不到电影，返回None。
+        """
+        if not title:
+            raise ValueError("标题不能为空")
+        if year and not year.isdigit():
+            raise ValueError("年份必须为数字")
+
+        post_url = "{0}/search/movie".format(self.api_url)
+        post_params = dict(api_key=self.key, query=title, language=language)
+        response = self.send_request(post_url, post_params)
+        if response is None:
+            return None
+
+        return_data = response.json()
+        return_data['request_code'] = response.status_code
+        if silent:
+            return return_data
+
+        failure_msg = Fore.RED + '\n[MovieSearch●失败]' + Style.RESET_ALL
+        success_msg = Fore.GREEN + '\n[MovieSearch●成功]' + Style.RESET_ALL
+        if response.status_code != 200:
+            print(f"{failure_msg} title: {title}\n{return_data['status_message']}")
+            return return_data
+
+        if len(return_data['results']) == 0:
+            print(f"{failure_msg} 关键词[{title}]查找不到任何相关电影")
+            return return_data
+
+        if return_data['results']:
+            movie = return_data['results'][0]
+            english_title = movie.get('original_title')
+            # 如果获取的英文标题含有中文，则返回None
+            if english_title and any('\u4e00' <= char <= '\u9fff' for char in english_title):
+                english_title = None
+            return {
+                'year': movie.get('release_date', '')[:4],
+                'english_title': english_title,
+                'chinese_title': movie.get('title'),  # 假设 'original_title' 是中文标题
+                # 添加其他你需要的信息
+            }
+
+        print(f"{success_msg} 关键词[{title}]查找结果如下: ")
+        print("{:<11}{:<8}{:<10}{}".format("首播时间", "序号", "TMDB-ID", "电影标题"))
+        for i, result in enumerate(return_data['results']):  # 使用 return_data['results'] 而不是 movie
+            print("{:<15}{:<10}{:<10}{}".format(result['release_date'], str(i + 1), str(result['id']), result['title']))
+
+        return_data['results'] = movie
+        return return_data
