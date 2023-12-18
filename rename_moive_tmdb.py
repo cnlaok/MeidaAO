@@ -130,13 +130,143 @@ class MovieRenamer:
                 rename_dict[file_path] = os.path.join(os.path.dirname(file_path), new_filename)
         return rename_dict or {}
 
-    def process_plex_info(self, file_path: str, files_info: Dict[str, Dict[str, str]]) -> Dict[str, str]:
-        final_elements = self.process_file_info(file_path, files_info, self.plex_api)
-        return final_elements
 
     def process_tmdb_info(self, file_path: str, files_info: Dict[str, Dict[str, str]]) -> Dict[str, str]:
-        final_elements = self.process_file_info(file_path, files_info, self.tmdb)
+        final_elements = {}
+        elements_from_file = files_info[file_path]
+        chinese_title = elements_from_file['chinese_title']
+        english_title = elements_from_file['english_title']
+        year = elements_from_file['year']
+        tmdb_id = elements_from_file.get('tmdb_id')  # 尝试从文件名中获取TMDB ID
+
+        if tmdb_id is not None:
+            # 如果文件名包含TMDB ID，直接使用它来查询TMDB数据库
+            movie = self.tmdb.movie_info(tmdb_id)
+            if movie:
+                final_elements = {
+                    'year': movie.get('release_date', '')[:4],
+                    'english_title': movie.get('original_title'),
+                    'chinese_title': movie.get('title'),  # 假设 'title' 是中文标题
+                    # 添加其他你需要的信息
+                }
+        else:
+            # 否则，使用从电影文件名中提取的标题和年份去匹配TMDB数据库
+            tmdb_info = self.tmdb.search_movie_info(chinese_title or english_title, year)
+
+            if tmdb_info:
+                final_elements = elements_from_file.copy()  # 复制一份文件信息
+                for key, value in tmdb_info.items():
+                    if value:
+                        final_elements[key] = value
+
+        # 处理最终元素大小写问题
+        for key, value in final_elements.items():
+            if isinstance(value, str):
+                if key == 'english_title':
+                    # 英文标题转换为首字母大写的形式
+                    final_elements[key] = value.title().replace(' ', '.').replace('-', '：').replace(':', '：').replace(': ', '：').replace(' :', '：').replace('?', '？').replace('/', '.')
+                elif key == 'chinese_title':
+                    final_elements[key] = value.title().replace('-', '：').replace(':', '：').replace(': ', '：').replace(' :', '：').replace('?', '？').replace('/', '.')
+                elif key == 'bit_depth':
+                    # 保持 bit_depth 的值为小写
+                    final_elements[key] = value.lower()
+                else:
+                    # 其他元素全部转换为大写
+                    final_elements[key] = value.upper().replace(' ', '.')
+
+        # 映射最终文件名中的一些元素
+        replace_dict = {
+            '<': '＜',
+            '>': '＞',
+            ':': '：',
+            '"': '＂',
+            '/': '／',
+            '\\': '＼',
+            ':.': '：',
+            '.:': '：',            
+            '|': '｜',
+            '?': '',
+            '?.': '',
+            '!': ''
+        }
+        for key, value in final_elements.items():
+            if isinstance(value, str):
+                for old, new in replace_dict.items():
+                    final_elements[key] = value.replace(old, new)
+
         return final_elements
+
+    def process_plex_info(self, file_path: str, files_info: Dict[str, Dict[str, str]]) -> Dict[str, str]:
+        final_elements = {}
+        elements_from_file = files_info[file_path]
+        chinese_title = elements_from_file['chinese_title']
+        english_title = elements_from_file['english_title']
+        year = elements_from_file['year']
+
+        # 使用从电影文件名中提取的标题和年份去匹配Plex数据库
+        plex_info = self.plex_api.search_movie(chinese_title or english_title, year)
+
+        if plex_info:
+            final_elements = elements_from_file.copy()  # 复制一份文件信息
+            for key, value in plex_info.items():
+                if value and final_elements.get(key) is None:
+                    if isinstance(value, str):
+                        if key == 'english_title':
+                            # 英文标题转换为首字母大写的形式
+                            final_elements[key] = value.title().replace(' ', '.')
+                        else:
+                            # 其他元素全部转换为大写
+                            final_elements[key] = value.upper().replace(' ', '.')
+                    elif isinstance(value, int):
+                        # 将整数转换为字符串
+                        final_elements[key] = str(value)
+            # 使用 Plex 的中文标题（如果存在且包含中文字符）
+            if 'chinese_title' in plex_info and plex_info['chinese_title'] and any('\u4e00' <= char <= '\u9fff' for char in plex_info['chinese_title']):
+                final_elements['chinese_title'] = plex_info['chinese_title']
+
+            # 使用 Plex 的 HDR 信息（如果存在）
+            if 'hdr_info' in plex_info and plex_info['hdr_info']:
+                final_elements['hdr_info'] = plex_info['hdr_info']
+
+        # 处理最终元素大小写问题
+        for key, value in final_elements.items():
+            if isinstance(value, str):
+                if key == 'english_title':
+                    # 英文标题转换为首字母大写的形式
+                    final_elements[key] = value.title().replace(' ', '.').replace('-', '：').replace(':', '：').replace(': ', '：').replace(' :', '：').replace('?', '？').replace('/', '.')
+                elif key == 'chinese_title':
+                    final_elements[key] = value.title().replace('-', '：').replace(':', '：').replace(': ', '：').replace(' :', '：').replace('?', '？').replace('/', '.')
+                elif key == 'bit_depth':
+                    # 保持 bit_depth 的值为小写
+                    final_elements[key] = value.lower()
+                else:
+                    # 其他元素全部转换为大写
+                    final_elements[key] = value.upper().replace(' ', '.')
+
+        # 映射最终文件名中的一些元素
+        replace_dict = {
+            '<': '＜',
+            '>': '＞',
+            ':': '：',
+            '"': '＂',
+            '/': '／',
+            '\\': '＼',
+            ':.': '：',
+            '.:': '：',            
+            '|': '｜',
+            '?': '',
+            '?.': '',
+            '!': ''
+        }
+        for key, value in final_elements.items():
+            if isinstance(value, str):
+                for old, new in replace_dict.items():
+                    final_elements[key] = value.replace(old, new)
+
+        return final_elements
+
+
+
 
 
     # 定义一个函数来计算两个字符串的相似度
@@ -245,82 +375,6 @@ class MovieRenamer:
 
         return files_info, all_filenames
 
-    def process_file_info(self, file_path: str, files_info: Dict[str, Dict[str, str]], api):
-        final_elements = {}  # 初始化 final_elements
-        elements_from_file = files_info[file_path]
-        chinese_title = elements_from_file['chinese_title']
-        english_title = elements_from_file['english_title']
-        year = elements_from_file['year']
-        print(elements_from_file)
-        if self.mode == 'plex':
-            plex_info = self.search_movie(file_path, chinese_title, english_title, year)
-            if plex_info:
-                final_elements = elements_from_file.copy() # 复制一份文件信息
-                for key, value in plex_info.items():
-                    if value and final_elements.get(key) is None:
-                        if isinstance(value, str):
-                            if key == 'english_title':
-                                # 英文标题转换为首字母大写的形式
-                                final_elements[key] = value.title().replace(' ', '.')
-                            else:
-                                # 其他元素全部转换为大写
-                                final_elements[key] = value.upper().replace(' ', '.')
-                        elif isinstance(value, int):
-                            # 将整数转换为字符串
-                            final_elements[key] = str(value)
-                # 使用 Plex 的中文标题（如果存在且包含中文字符）
-                if 'chinese_title' in plex_info and plex_info['chinese_title'] and any('\u4e00' <= char <= '\u9fff' for char in plex_info['chinese_title']):
-                    final_elements['chinese_title'] = plex_info['chinese_title']
-
-                # 使用 Plex 的 HDR 信息（如果存在）
-                if 'hdr_info' in plex_info and plex_info['hdr_info']:
-                    final_elements['hdr_info'] = plex_info['hdr_info']
-        elif self.mode == 'tmdb':
-            tmdb_info = self.tmdb.search_movie_info(chinese_title or english_title, year)
-            if tmdb_info:
-                final_elements = elements_from_file.copy() # 复制一份文件信息
-                for key, value in tmdb_info.items():
-                    if value:
-                        final_elements[key] = value
-
-        # 处理最终元素大小写问题
-        for key, value in final_elements.items():
-            if isinstance(value, str):
-                if key == 'english_title':
-                    # 英文标题转换为首字母大写的形式
-                    final_elements[key] = value.title().replace(' ', '.').replace('-', '：').replace(':', '：').replace(': ', '：').replace(' : ', '：')
-                elif key == 'chinese_title':
-                    final_elements[key] = value.title().replace('-', '：')
-                elif key == 'bit_depth':
-                    # 保持 bit_depth 的值为小写
-                    final_elements[key] = value.lower()
-                else:
-                    # 其他元素全部转换为大写
-                    final_elements[key] = value.upper().replace(' ', '.')
-
-        # 映射最终文件名中的一些元素
-        replace_dict = {
-            '<': '＜',
-            '>': '＞',
-            ':': '：',
-            '"': '＂',
-            '/': '／',
-            '\\': '＼',
-            ':.': '：',
-            '.:': '：',            
-            '|': '｜',
-            '?': '',
-            '?.': '',
-            '!': ''
-        }
-        for key, value in final_elements.items():
-            if isinstance(value, str):
-                for old, new in replace_dict.items():
-                    final_elements[key] = value.replace(old, new)
-
-        return final_elements
-
-
 
     def get_file_info(self, file_path: str) -> Dict[str, str]:
         """
@@ -332,6 +386,8 @@ class MovieRenamer:
         返回:
         Dict[str, str]: 一个字典，包含从文件名中提取的信息。
         """
+        parent_folder_name = os.path.basename(os.path.dirname(file_path))
+
         print(Fore.GREEN + "文件正在提取元素: " + Style.RESET_ALL + f"{os.path.basename(file_path)}")
         file_name_no_ext, file_ext = os.path.splitext(os.path.basename(file_path))
         file_ext = file_ext[1:]  # 获取不包含点号的扩展名
@@ -346,6 +402,7 @@ class MovieRenamer:
         file_name_no_ext = re.sub(r'【.*?】', '', file_name_no_ext)
         file_name_no_ext = re.sub(r'\{.*?\}', '', file_name_no_ext)
         file_name_no_ext = re.sub(r'\[.*?\]', '', file_name_no_ext)
+
 
         self.elements_regex = self.config['elements_regex']
         elements = {key: None for key in self.elements_regex.keys()}
@@ -405,7 +462,9 @@ class MovieRenamer:
             chinese_title = re.search(r'[\u4e00-\u9fff0-9a-zA-Z：，·-]*', parent_folder_name)
             if chinese_title:
                 elements['chinese_title'] = chinese_title.group(0)
-
+        tmdb_id_match = re.search(r'\{tmdb-(\d+)\}', parent_folder_name)
+        if tmdb_id_match:
+            elements['tmdb_id'] = tmdb_id_match.group(1)
         return elements
 
     def search_movie(self, file_path: str, chinese_title: str = None, english_title: str = None, year: str = None) -> str:
@@ -558,35 +617,6 @@ class MovieRenamer:
         old_name = os.path.basename(old_name)
         new_name = os.path.basename(new_name)
         return f"{index}. 改前名: {Fore.BLUE}{old_name}{Style.RESET_ALL}\n{index}. 改后名: {Fore.GREEN}{new_name}{Style.RESET_ALL}"
-
-
-    def process_single_folder(self, folder_path):
-        # 检查路径是否存在并且是一个文件夹
-        if not os.path.isdir(folder_path):
-            print(f"路径 {folder_path} 不存在或者不是一个文件夹。")
-            return
-
-        # 提取文件夹名称
-        folder_name = os.path.basename(folder_path)
-
-        # 提取文件夹信息
-        title, year = self.extract_folder_info(folder_name)
-
-        # 根据库类型搜索匹配的内容
-        matched_content = None
-        if self.library_type_index == 1:
-            print(f"正在搜索电影中：{title} ({year})")
-            matched_content = self.tmdb.search_movie(title, year)
-        elif self.library_type_index == 2:
-            print(f"正在搜索剧集中：{title} ({year})")
-            matched_content = self.tmdb.search_tv(title, year)
-
-        # 如果找到匹配的内容，重命名文件夹
-        if matched_content:
-            print(f"从库中获取内容: {matched_content['title']} ({matched_content['year']}) {{tmdbid-{matched_content['tmdbid']}}}")
-            tmdb_id = matched_content['tmdbid']
-            new_folder_name = self.folder_title_format(matched_content['title'], matched_content['year'], tmdb_id)
-            self.process_folder(folder_path, new_folder_name, matched_content)
 
 
 if __name__ == "__main__":
